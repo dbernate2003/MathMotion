@@ -224,16 +224,18 @@ input,select{font-family:inherit}
 /* Flotar sutil. Sin rotación: al girar, el navegador recalcula la sombra
    del SVG en cada fotograma y los bordes de los dedos vibran.
    translate3d y will-change lo mantienen en su propia capa. */
-.hand-float{
+.hand-float .hand-g{
   animation:handFloat 14s ease-in-out infinite;
-  will-change:transform;
-  transform:translate3d(0,0,0);
-  backface-visibility:hidden;
+  transform-box:view-box;
+  transform-origin:50% 50%;
 }
 @keyframes handFloat{
-  0%,100%{transform:translate3d(0,0,0)}
-  50%{transform:translate3d(0,-3px,0)}
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-4px)}
 }
+/* Los contenedores de la mano animada quedan aislados del resto del
+   flujo: su contenido no puede afectar al desplazamiento de la página. */
+.ob-art,.perm-art{contain:layout paint;overflow:hidden}
 .hand-btn{
   position:relative;flex:1;aspect-ratio:1/1.12;
   border-radius:var(--r-m);
@@ -273,7 +275,7 @@ input,select{font-family:inherit}
   text-align:center;gap:6px;overflow-y:auto;
 }
 .ob-art{
-  width:164px;height:164px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  width:150px;height:150px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
   position:relative;margin-bottom:6px;
 }
 .ob-art::after{
@@ -289,7 +291,7 @@ input,select{font-family:inherit}
 .ob-slide h2{font-size:26px;font-weight:700;letter-spacing:-.025em;margin:0 0 8px;line-height:1.15}
 .ob-slide p{max-width:290px;font-size:14.5px;line-height:1.62;color:var(--tx-2);margin:0}
 .ob-apply{
-  margin-top:16px;padding:12px 16px;border-radius:var(--r-m);
+  margin-top:9px;padding:11px 15px;border-radius:var(--r-m);
   background:var(--surface);border:1px solid var(--line);
   font-size:12.5px;color:var(--tx-3);line-height:1.55;max-width:300px;text-align:left;
 }
@@ -1005,7 +1007,7 @@ function handSVG(n, opt={}){
       <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#5B3FE0" flood-opacity=".45"/>
     </filter>
   </defs>
-  <g${sombra}>
+  <g class="hand-g"${sombra}>
     <!-- muñeca -->
     <rect x="45" y="116" width="32" height="30" rx="13" fill="url(#g${id})" opacity=".85"/>
     <!-- pulgar extendido (detrás de la palma) -->
