@@ -1,0 +1,2059 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#07090F">
+<title>MathMotion — Cálculo en Movimiento</title>
+<style>
+/* ============================================================
+   MathMotion · Sistema de diseño
+   Tokens únicos. Cambiar aquí = cambia toda la app.
+   ============================================================ */
+:root{
+  /* superficies */
+  --bg:#06070D;
+  --bg-deep:#04050A;
+  --surface:#0F1220;
+  --surface-2:#161A2C;
+  --surface-3:#1E2338;
+  --line:rgba(255,255,255,.07);
+  --line-2:rgba(255,255,255,.13);
+
+  /* texto */
+  --tx:#E9ECF8;
+  --tx-2:#9BA2C4;
+  --tx-3:#5F678C;
+
+  /* marca */
+  --acc:#7C5CFF;
+  --acc-2:#00D9F5;
+  --acc-grad:linear-gradient(135deg,#7C5CFF 0%,#00D9F5 100%);
+
+  /* colores matemáticos — consistentes en TODA la app */
+  --c-fx:#25D9F0;      /* f(x)          */
+  --c-fpx:#A78BFA;     /* f'(x)         */
+  --c-fppx:#FF6FA5;    /* f''(x)        */
+  --c-tan:#3DDC97;     /* recta tangente*/
+  --c-sec:#FFA83D;     /* recta secante */
+  --c-max:#FF5C7A;     /* máximo        */
+  --c-min:#3DDC97;     /* mínimo        */
+  --c-inf:#FFD166;     /* inflexión     */
+  --c-up:rgba(61,220,151,.13);
+  --c-down:rgba(255,92,122,.13);
+
+  /* estados */
+  --ok:#3DDC97;
+  --warn:#FFA83D;
+  --err:#FF5C7A;
+
+  /* medidas */
+  --nav-h:76px;
+  --r-s:10px;
+  --r-m:16px;
+  --r-l:22px;
+  --r-xl:30px;
+
+  --fs-ui:'Inter','SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --fs-mono:'JetBrains Mono','SFMono-Regular',ui-monospace,'Cascadia Code',Consolas,monospace;
+
+  --ease:cubic-bezier(.22,.85,.3,1);
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%}
+body{
+  min-height:100dvh;
+  background:
+    radial-gradient(900px 600px at 15% -10%, rgba(124,92,255,.16), transparent 60%),
+    radial-gradient(800px 700px at 100% 100%, rgba(0,217,245,.10), transparent 55%),
+    var(--bg-deep);
+  color:var(--tx);
+  font-family:var(--fs-ui);
+  display:flex; align-items:center; justify-content:center;
+  gap:56px; padding:40px 24px;
+  min-height:100%;
+}
+button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer}
+input,select{font-family:inherit}
+::-webkit-scrollbar{width:0;height:0}
+
+/* ---------- Marco del dispositivo (solo escritorio) ---------- */
+.stage{display:flex;flex-direction:column;align-items:center;gap:18px}
+.device{
+  height:min(844px, calc(100dvh - 56px));
+  aspect-ratio:392 / 844;
+  width:auto;
+  border-radius:52px;
+  padding:11px;
+  background:linear-gradient(160deg,#23273D,#0B0D16 45%,#23273D);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.05),
+    0 50px 120px -20px rgba(0,0,0,.85),
+    0 0 90px -30px rgba(124,92,255,.4);
+  flex:0 0 auto;
+}
+.screen{
+  position:relative;width:100%;height:100%;
+  border-radius:42px;overflow:hidden;
+  background:var(--bg);
+  isolation:isolate;
+}
+.notch{
+  position:absolute;top:9px;left:50%;transform:translateX(-50%);
+  width:112px;height:28px;border-radius:16px;background:#000;z-index:90;
+}
+.statusbar{
+  position:absolute;top:0;left:0;right:0;height:46px;z-index:80;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 26px 0;font-size:13px;font-weight:600;letter-spacing:.2px;
+  pointer-events:none;color:var(--tx);
+}
+.sb-icons{display:flex;gap:5px;align-items:center;opacity:.9}
+
+/* ---------- Panel lateral informativo (escritorio) ---------- */
+.aside{max-width:330px;display:flex;flex-direction:column;gap:22px}
+.aside h1{
+  font-size:34px;line-height:1.05;margin:0;font-weight:700;letter-spacing:-.02em;
+}
+.aside h1 span{
+  background:var(--acc-grad);-webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.aside p{margin:0;color:var(--tx-2);font-size:14.5px;line-height:1.65}
+.aside .legend{display:flex;flex-direction:column;gap:9px;font-size:13px;color:var(--tx-2)}
+.aside .legend div{display:flex;align-items:center;gap:10px}
+.aside .legend i{width:22px;height:3px;border-radius:2px;display:block}
+.aside code{
+  font-family:var(--fs-mono);font-size:12px;color:var(--acc-2);
+  background:rgba(0,217,245,.08);padding:2px 6px;border-radius:6px;
+}
+.aside .note{
+  border-left:2px solid var(--acc);padding-left:14px;font-size:13px;color:var(--tx-3);line-height:1.6;
+}
+
+/* ============================================================
+   Capas de pantalla
+   ============================================================ */
+.view{
+  position:absolute;inset:0;z-index:10;
+  display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;transform:translateY(10px) scale(.99);
+  transition:opacity .3s var(--ease),transform .35s var(--ease),visibility .3s;
+  overflow:hidden;
+}
+.view.active{opacity:1;visibility:visible;transform:none}
+.view.over{z-index:60}
+.scroll{
+  flex:1;overflow-y:auto;overflow-x:hidden;
+  padding:56px 20px calc(var(--nav-h) + 26px);
+  -webkit-overflow-scrolling:touch;
+}
+.view.no-nav .scroll{padding-bottom:26px}
+
+/* ---------- Tipografía interna ---------- */
+.eyebrow{font-size:12px;color:var(--tx-3);letter-spacing:.02em;margin:0 0 6px}
+.h-xl{font-size:29px;font-weight:700;letter-spacing:-.025em;line-height:1.12;margin:0}
+.h-l{font-size:20px;font-weight:650;letter-spacing:-.015em;margin:0}
+.h-m{font-size:15.5px;font-weight:620;letter-spacing:-.01em;margin:0}
+.body{font-size:14px;line-height:1.6;color:var(--tx-2);margin:0}
+.small{font-size:12.5px;line-height:1.5;color:var(--tx-3);margin:0}
+.mono{font-family:var(--fs-mono);font-variant-ligatures:none}
+
+/* ---------- Componentes base ---------- */
+.card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r-l);
+  padding:18px;
+}
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  height:52px;border-radius:var(--r-m);font-size:15.5px;font-weight:620;
+  transition:transform .15s var(--ease),filter .2s;
+  width:100%;
+}
+.btn:active{transform:scale(.975)}
+.btn-primary{background:var(--acc-grad);color:#080A12;box-shadow:0 10px 30px -12px rgba(124,92,255,.8)}
+.btn-ghost{background:var(--surface-2);color:var(--tx);border:1px solid var(--line-2)}
+.btn-quiet{background:none;color:var(--tx-2);height:44px;font-weight:560}
+.chip{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:8px 13px;border-radius:999px;font-size:12.5px;font-weight:560;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--tx-2);
+  white-space:nowrap;transition:.2s var(--ease);
+}
+.chip.on{background:rgba(124,92,255,.16);border-color:rgba(124,92,255,.5);color:#CFC4FF}
+.chip-row{display:flex;gap:8px;overflow-x:auto;padding:2px 0 2px}
+
+/* ---------- Barra de navegación inferior ---------- */
+.nav{
+  position:absolute;left:0;right:0;bottom:0;height:var(--nav-h);z-index:70;
+  display:grid;grid-template-columns:repeat(5,1fr);align-items:center;
+  background:rgba(9,11,20,.82);
+  backdrop-filter:blur(22px) saturate(150%);
+  -webkit-backdrop-filter:blur(22px) saturate(150%);
+  border-top:1px solid var(--line);
+  padding-bottom:6px;
+  transition:transform .35s var(--ease),opacity .3s;
+}
+.nav.hide{transform:translateY(100%);opacity:0;pointer-events:none}
+.nav-item{
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  color:var(--tx-3);font-size:10.5px;font-weight:560;padding-top:6px;
+  transition:color .2s;
+}
+.nav-item svg{width:22px;height:22px;stroke-width:1.7}
+.nav-item.on{color:var(--tx)}
+.nav-item.on svg{stroke:url(#navgrad)}
+.nav-fab-wrap{display:flex;justify-content:center;align-items:flex-start}
+.nav-fab{
+  width:60px;height:60px;border-radius:22px;margin-top:-26px;
+  background:var(--acc-grad);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 14px 34px -10px rgba(124,92,255,.9),0 0 0 5px rgba(9,11,20,.9);
+  transition:transform .2s var(--ease);
+}
+.nav-fab:active{transform:scale(.93)}
+.nav-fab svg{width:27px;height:27px;stroke:#0A0C16;stroke-width:1.9}
+
+/* ============================================================
+   Mano SVG — elemento característico de la marca
+   ============================================================ */
+.hand{display:block;overflow:visible}
+.hand .fg-up{transition:opacity .3s var(--ease),transform .35s var(--ease)}
+/* Flotar sutil. Sin rotación: al girar, el navegador recalcula la sombra
+   del SVG en cada fotograma y los bordes de los dedos vibran.
+   translate3d y will-change lo mantienen en su propia capa. */
+.hand-float{
+  animation:handFloat 6.5s ease-in-out infinite;
+  will-change:transform;
+  transform:translate3d(0,0,0);
+}
+@keyframes handFloat{
+  0%,100%{transform:translate3d(0,0,0)}
+  50%{transform:translate3d(0,-5px,0)}
+}
+.hand-btn{
+  position:relative;flex:1;aspect-ratio:1/1.12;
+  border-radius:var(--r-m);
+  background:var(--surface-2);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;
+  transition:.22s var(--ease);overflow:hidden;
+}
+.hand-btn .n{
+  position:absolute;top:6px;left:8px;font-family:var(--fs-mono);
+  font-size:11px;color:var(--tx-3);transition:.2s;
+}
+.hand-btn svg{width:84%;height:84%;opacity:.62;transition:.22s var(--ease)}
+.hand-btn.on{
+  background:linear-gradient(160deg,rgba(124,92,255,.22),rgba(0,217,245,.1));
+  border-color:rgba(124,92,255,.55);
+  box-shadow:0 8px 26px -12px rgba(124,92,255,.9);
+}
+.hand-btn.on svg{opacity:1;transform:scale(1.06)}
+.hand-btn.on .n{color:#CFC4FF}
+.hand-row{display:flex;gap:8px}
+
+/* ============================================================
+   Onboarding
+   ============================================================ */
+#v-onboarding .scroll{padding:0;overflow:hidden;display:flex;flex-direction:column}
+.ob-top{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:58px 22px 0;flex:0 0 auto;
+}
+.ob-dots{display:flex;gap:6px}
+.ob-dots i{width:6px;height:6px;border-radius:9px;background:var(--surface-3);transition:.3s var(--ease)}
+.ob-dots i.on{width:22px;background:var(--acc)}
+.ob-track{flex:0 0 auto;display:flex;transition:transform .45s var(--ease);height:100%}
+.ob-slide{
+  min-width:100%;height:100%;padding:14px 28px 8px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;gap:6px;overflow-y:auto;
+}
+.ob-art{
+  width:164px;height:164px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  position:relative;margin-bottom:6px;
+}
+.ob-art::after{
+  content:'';position:absolute;inset:14%;border-radius:50%;
+  background:radial-gradient(circle,rgba(124,92,255,.28),transparent 68%);
+  filter:blur(14px);z-index:-1;
+}
+.ob-badge{
+  font-family:var(--fs-mono);font-size:12px;color:var(--acc-2);
+  background:rgba(0,217,245,.1);border:1px solid rgba(0,217,245,.25);
+  padding:5px 12px;border-radius:999px;margin-bottom:12px;
+}
+.ob-slide h2{font-size:26px;font-weight:700;letter-spacing:-.025em;margin:0 0 8px;line-height:1.15}
+.ob-slide p{max-width:290px;font-size:14.5px;line-height:1.62;color:var(--tx-2);margin:0}
+.ob-apply{
+  margin-top:16px;padding:12px 16px;border-radius:var(--r-m);
+  background:var(--surface);border:1px solid var(--line);
+  font-size:12.5px;color:var(--tx-3);line-height:1.55;max-width:300px;text-align:left;
+}
+.ob-apply b{color:var(--tx-2);font-weight:600}
+.ob-foot{padding:20px 22px 30px;display:flex;flex-direction:column;gap:8px;flex:0 0 auto}
+
+/* ============================================================
+   Inicio
+   ============================================================ */
+.hero{
+  position:relative;border-radius:var(--r-xl);overflow:hidden;
+  background:linear-gradient(165deg,#1A1533 0%,#0D1020 55%,#0A1420 100%);
+  border:1px solid var(--line-2);
+  padding:24px 22px 22px;
+}
+.hero::before{
+  content:'';position:absolute;top:-70px;right:-70px;width:230px;height:230px;border-radius:50%;
+  background:radial-gradient(circle,rgba(124,92,255,.4),transparent 65%);filter:blur(28px);
+}
+.hero-grid{position:absolute;inset:0;opacity:.5}
+.hero-mark{display:flex;align-items:center;gap:10px;position:relative;margin-bottom:16px}
+.hero-mark .dot{width:9px;height:9px;border-radius:3px;background:var(--acc-grad)}
+.hero-mark span{font-size:12.5px;color:var(--tx-2);font-weight:560;letter-spacing:.04em}
+.hero h2{position:relative;font-size:31px;font-weight:700;letter-spacing:-.03em;margin:0 0 2px;line-height:1.06}
+.hero .sub{position:relative;font-size:15px;color:var(--acc-2);font-weight:520;margin:0 0 14px}
+.hero p{position:relative;font-size:14px;line-height:1.62;color:var(--tx-2);margin:0;max-width:290px}
+.hero-curve{position:absolute;right:-6px;bottom:-4px;width:150px;opacity:.85;pointer-events:none}
+
+.sect{margin-top:26px}
+.sect-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:13px}
+.sect-head a{font-size:12.5px;color:var(--acc-2);text-decoration:none;font-weight:560}
+
+.gest-list{display:flex;flex-direction:column;gap:9px}
+.gest-item{
+  display:flex;align-items:center;gap:14px;
+  padding:13px 15px;border-radius:var(--r-m);
+  background:var(--surface);border:1px solid var(--line);
+  transition:.2s var(--ease);text-align:left;width:100%;
+}
+.gest-item:active{transform:scale(.985);background:var(--surface-2)}
+.gest-item .ic{
+  width:44px;height:44px;flex:0 0 auto;border-radius:13px;
+  background:var(--surface-2);display:flex;align-items:center;justify-content:center;
+}
+.gest-item .ic svg{width:90%;height:90%}
+.gest-item .tt{font-size:14.5px;font-weight:600;margin:0 0 2px}
+.gest-item .dd{font-size:12.5px;color:var(--tx-3);margin:0;line-height:1.4}
+
+.flow{display:flex;flex-direction:column;gap:0}
+.flow-step{display:flex;gap:14px;align-items:flex-start}
+.flow-rail{display:flex;flex-direction:column;align-items:center;flex:0 0 auto;width:26px}
+.flow-rail .b{
+  width:26px;height:26px;border-radius:9px;background:var(--surface-2);
+  border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;
+  font-family:var(--fs-mono);font-size:11.5px;color:var(--acc-2);
+}
+.flow-rail .l{width:1px;flex:1;background:linear-gradient(var(--line-2),transparent);min-height:22px}
+.flow-body{padding-bottom:18px}
+.flow-body h4{font-size:14px;font-weight:600;margin:3px 0 3px}
+.flow-body p{font-size:12.8px;color:var(--tx-3);line-height:1.5;margin:0}
+
+.fn-active{
+  display:flex;align-items:center;gap:14px;padding:16px;
+  border-radius:var(--r-l);background:var(--surface);border:1px solid var(--line);
+}
+.fn-active .thumb{
+  width:62px;height:52px;flex:0 0 auto;border-radius:12px;
+  background:var(--surface-2);overflow:hidden;
+}
+.tag{
+  display:inline-block;font-size:10.5px;padding:3px 8px;border-radius:6px;
+  background:rgba(255,168,61,.13);color:var(--c-sec);font-weight:600;
+}
+
+/* ============================================================
+   Biblioteca de funciones
+   ============================================================ */
+.fn-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;grid-auto-rows:1fr}
+.fn-card{
+  border-radius:var(--r-m);background:var(--surface);
+  border:1px solid var(--line);overflow:hidden;text-align:left;
+  transition:.2s var(--ease);
+}
+.fn-card:active{transform:scale(.98)}
+.fn-card.on{border-color:rgba(124,92,255,.6);box-shadow:0 0 0 1px rgba(124,92,255,.35)}
+.fn-card .prev{height:82px;background:var(--surface-2);position:relative;flex:0 0 auto}
+.fn-card{display:flex;flex-direction:column}
+.fn-card .prev .badge{
+  position:absolute;top:7px;right:8px;font-size:9.5px;padding:3px 7px;border-radius:5px;
+  background:rgba(124,92,255,.9);color:#0A0C16;font-weight:700;
+}
+.fn-card .meta{padding:11px 12px 13px}
+.fn-card .expr{
+  font-family:var(--fs-mono);font-size:12.5px;color:var(--tx);
+  margin:0 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.fn-card .fam{font-size:11px;color:var(--tx-3);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ============================================================
+   Historial
+   ============================================================ */
+.hist-day{
+  font-size:12px;color:var(--tx-3);margin:22px 0 10px;
+  display:flex;align-items:center;gap:10px;
+}
+.hist-day::after{content:'';flex:1;height:1px;background:var(--line)}
+.hist-item{
+  display:flex;align-items:center;gap:13px;padding:13px 14px;
+  border-radius:var(--r-m);background:var(--surface);border:1px solid var(--line);
+  margin-bottom:8px;width:100%;text-align:left;
+}
+.hist-item .ic{
+  width:40px;height:40px;border-radius:12px;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;background:var(--surface-2);
+}
+.hist-item .ic svg{width:88%;height:88%}
+.hist-item .t{font-size:13.8px;font-weight:600;margin:0 0 3px}
+.hist-item .s{font-family:var(--fs-mono);font-size:11.5px;color:var(--tx-3);margin:0}
+.hist-item .r{margin-left:auto;text-align:right;flex:0 0 auto}
+.hist-item .r .v{font-family:var(--fs-mono);font-size:12.5px;color:var(--c-fx)}
+.hist-item .r .h{font-size:10.5px;color:var(--tx-3);margin-top:2px}
+.empty{
+  text-align:center;padding:60px 24px;display:flex;flex-direction:column;
+  align-items:center;gap:12px;
+}
+.empty svg{width:54px;height:54px;opacity:.4}
+
+/* ============================================================
+   Ajustes
+   ============================================================ */
+.set-group{margin-top:24px}
+.set-group > .lbl{font-size:12px;color:var(--tx-3);margin:0 0 9px 4px}
+.set-list{border-radius:var(--r-m);background:var(--surface);border:1px solid var(--line);overflow:hidden}
+.set-row{
+  display:flex;align-items:center;gap:13px;padding:14px 15px;
+  border-bottom:1px solid var(--line);width:100%;text-align:left;
+}
+.set-row:last-child{border-bottom:0}
+.set-row .t{font-size:14px;font-weight:540;margin:0}
+.set-row .d{font-size:11.5px;color:var(--tx-3);margin:2px 0 0;line-height:1.4}
+.set-row .rgt{margin-left:auto;flex:0 0 auto}
+.switch{
+  width:46px;height:27px;border-radius:14px;background:var(--surface-3);
+  position:relative;transition:.25s var(--ease);flex:0 0 auto;
+}
+.switch::after{
+  content:'';position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;
+  background:#fff;transition:.25s var(--ease);
+}
+.switch.on{background:var(--acc)}
+.switch.on::after{transform:translateX(19px)}
+.inp{
+  width:100%;height:44px;border-radius:var(--r-s);background:var(--surface-2);
+  border:1px solid var(--line-2);padding:0 13px;color:var(--tx);
+  font-family:var(--fs-mono);font-size:12.5px;outline:none;
+}
+.inp:focus{border-color:var(--acc)}
+
+/* ============================================================
+   Pantalla principal — Cámara + Gráfica
+   ============================================================ */
+#v-camera{background:var(--bg)}
+.cam-wrap{position:relative;flex:1;display:flex;flex-direction:column;min-height:0}
+
+/* --- gráfica: 70 % superior --- */
+.graph-zone{
+  position:relative;height:70%;flex:0 0 auto;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(124,92,255,.10), transparent 62%),
+    var(--bg);
+  overflow:hidden;
+}
+.graph-svg{position:absolute;inset:0;width:100%;height:100%}
+
+/* --- miniatura de cámara --- */
+.cam-mini{
+  position:absolute;top:56px;right:14px;z-index:30;
+  width:92px;height:122px;border-radius:16px;overflow:hidden;
+  background:#0B0E18;
+  border:2px solid var(--tx-3);
+  box-shadow:0 12px 30px -10px rgba(0,0,0,.8);
+  transition:border-color .3s var(--ease),box-shadow .3s var(--ease);
+}
+.cam-mini video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.cam-mini.st-idle{border-color:#3A4160}
+.cam-mini.st-scan{border-color:var(--c-sec);box-shadow:0 0 22px -4px rgba(255,168,61,.55)}
+.cam-mini.st-ok{border-color:var(--ok);box-shadow:0 0 22px -4px rgba(61,220,151,.6)}
+.cam-mini.st-err{border-color:var(--err);box-shadow:0 0 22px -4px rgba(255,92,122,.55)}
+.cam-mini .ph{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:7px;text-align:center;padding:8px;
+}
+.cam-mini .ph span{font-size:9.5px;color:var(--tx-3);line-height:1.3}
+.cam-mini .lbl{
+  position:absolute;bottom:0;left:0;right:0;padding:5px 7px;
+  background:linear-gradient(transparent,rgba(6,7,13,.92));
+  font-size:9.5px;color:var(--tx-2);display:flex;align-items:center;gap:5px;
+}
+.cam-mini .lbl i{width:5px;height:5px;border-radius:50%;background:currentColor}
+.scanline{
+  position:absolute;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--c-sec),transparent);
+  animation:scan 2.2s linear infinite;opacity:.85;
+}
+@keyframes scan{0%{top:0}100%{top:100%}}
+
+/* --- pastilla flotante del gesto --- */
+.pill{
+  position:absolute;top:58px;left:14px;z-index:30;
+  display:flex;align-items:center;gap:10px;
+  padding:8px 15px 8px 9px;border-radius:999px;
+  background:rgba(15,18,32,.82);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border:1px solid var(--line-2);
+  box-shadow:0 10px 30px -12px rgba(0,0,0,.9);
+  transition:.3s var(--ease);
+}
+.pill.pop{animation:pillPop .45s var(--ease)}
+@keyframes pillPop{
+  0%{transform:scale(.9);opacity:.4}
+  55%{transform:scale(1.045)}
+  100%{transform:scale(1);opacity:1}
+}
+.pill .hd{width:30px;height:30px;flex:0 0 auto}
+.pill .txt .a{font-size:13px;font-weight:640;margin:0;line-height:1.15}
+.pill .txt .b{font-size:10.5px;color:var(--tx-3);margin:1px 0 0}
+
+/* --- leyenda de curvas --- */
+.legend-fl{
+  position:absolute;left:14px;bottom:46px;z-index:25;
+  display:flex;flex-direction:column;gap:5px;
+}
+.legend-fl div{display:flex;align-items:center;gap:7px;font-size:10.5px;color:var(--tx-2)}
+.legend-fl i{width:15px;height:2.5px;border-radius:2px;flex:0 0 auto}
+
+/* --- panel de información colapsable --- */
+.panel{
+  position:relative;flex:1;min-height:0;z-index:40;
+  background:var(--surface);
+  border-top:1px solid var(--line-2);
+  border-radius:24px 24px 0 0;
+  margin-top:-22px;
+  display:flex;flex-direction:column;
+  box-shadow:0 -22px 44px -22px rgba(0,0,0,.9);
+  transition:flex-basis .35s var(--ease);
+}
+.panel-grip{
+  padding:9px 0 4px;display:flex;justify-content:center;flex:0 0 auto;cursor:grab;
+  touch-action:none;
+}
+.panel-grip i{width:38px;height:4px;border-radius:3px;background:var(--surface-3)}
+.panel-body{
+  flex:1;overflow-y:auto;padding:2px 18px calc(var(--nav-h) + 14px);
+  transition:opacity .25s;
+}
+.panel.collapsed .panel-body{opacity:0;pointer-events:none}
+.panel-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.panel-head h3{font-size:16px;font-weight:650;letter-spacing:-.015em;margin:0}
+.panel-head .k{
+  margin-left:auto;font-family:var(--fs-mono);font-size:11px;color:var(--tx-3);
+  background:var(--surface-2);padding:4px 9px;border-radius:7px;
+}
+.vals{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.val{
+  background:var(--surface-2);border:1px solid var(--line);
+  border-radius:12px;padding:10px 12px;
+}
+.val .k{font-family:var(--fs-mono);font-size:10.5px;color:var(--tx-3);margin:0 0 3px}
+.val .v{font-family:var(--fs-mono);font-size:16px;font-weight:600;margin:0;letter-spacing:-.02em}
+.eqbox{
+  background:linear-gradient(140deg,rgba(61,220,151,.09),rgba(124,92,255,.06));
+  border:1px solid var(--line-2);border-radius:12px;padding:12px 13px;margin-bottom:12px;
+}
+.eqbox .k{font-size:11px;color:var(--tx-3);margin:0 0 5px}
+.eqbox .v{font-family:var(--fs-mono);font-size:14px;color:var(--tx);margin:0;line-height:1.45}
+.expl{margin-bottom:14px}
+.expl h5{font-size:12.5px;color:var(--tx-2);margin:0 0 5px;font-weight:600}
+.expl p{font-size:13px;line-height:1.6;color:var(--tx-3);margin:0 0 10px}
+
+/* --- controles --- */
+.ctrl{margin-bottom:14px}
+.ctrl-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.ctrl-head .l{font-size:12px;color:var(--tx-3)}
+.ctrl-head .v{font-family:var(--fs-mono);font-size:13px;color:var(--acc-2)}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:26px;background:none;
+}
+input[type=range]::-webkit-slider-runnable-track{
+  height:5px;border-radius:4px;background:var(--surface-3);
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+  background:#fff;margin-top:-7.5px;box-shadow:0 2px 10px rgba(0,0,0,.6),0 0 0 4px rgba(124,92,255,.28);
+}
+input[type=range]::-moz-range-track{height:5px;border-radius:4px;background:var(--surface-3)}
+input[type=range]::-moz-range-thumb{
+  width:20px;height:20px;border:0;border-radius:50%;background:#fff;
+  box-shadow:0 0 0 4px rgba(124,92,255,.28);
+}
+
+/* --- reto (5 dedos) --- */
+.quiz{background:var(--surface-2);border:1px solid var(--line-2);border-radius:var(--r-m);padding:15px}
+.quiz .q{font-size:13.5px;line-height:1.55;margin:0 0 12px}
+.quiz .opt{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:11px 13px;border-radius:11px;background:var(--surface);
+  border:1px solid var(--line);margin-bottom:7px;font-size:13px;
+  font-family:var(--fs-mono);transition:.2s var(--ease);
+}
+.quiz .opt.good{border-color:var(--ok);background:rgba(61,220,151,.12);color:var(--ok)}
+.quiz .opt.bad{border-color:var(--err);background:rgba(255,92,122,.1);color:var(--err)}
+.timer{
+  display:flex;align-items:center;gap:8px;font-family:var(--fs-mono);
+  font-size:12px;color:var(--c-sec);margin-bottom:10px;
+}
+.timer .bar{flex:1;height:4px;border-radius:3px;background:var(--surface-3);overflow:hidden}
+.timer .bar i{display:block;height:100%;background:var(--c-sec);transition:width 1s linear}
+
+/* ============================================================
+   Permiso de cámara
+   ============================================================ */
+.perm{
+  position:absolute;inset:0;z-index:75;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:34px 30px 26px;text-align:center;gap:5px;
+  overflow-y:auto;
+  transition:opacity .35s var(--ease),visibility .35s;
+}
+.perm.gone{opacity:0;visibility:hidden;pointer-events:none}
+.perm-art{
+  width:132px;height:132px;border-radius:38px;margin-bottom:22px;
+  background:linear-gradient(155deg,rgba(124,92,255,.24),rgba(0,217,245,.1));
+  border:1px solid var(--line-2);
+  display:flex;align-items:center;justify-content:center;position:relative;
+}
+.perm-art::after{
+  content:'';position:absolute;inset:-24px;border-radius:50%;
+  background:radial-gradient(circle,rgba(124,92,255,.22),transparent 66%);
+  filter:blur(16px);z-index:-1;
+}
+.perm h2{font-size:23px;font-weight:700;letter-spacing:-.02em;margin:0 0 10px}
+.perm p{font-size:14px;line-height:1.62;color:var(--tx-2);margin:0 0 6px;max-width:290px}
+.perm .btns{width:100%;margin-top:24px;display:flex;flex-direction:column;gap:9px}
+.perm .warn{
+  font-size:12px;color:var(--c-sec);background:rgba(255,168,61,.09);
+  border:1px solid rgba(255,168,61,.24);border-radius:11px;padding:10px 13px;
+  margin-top:14px;line-height:1.5;
+}
+
+/* ============================================================
+   Toast
+   ============================================================ */
+.toast{
+  position:absolute;left:50%;bottom:calc(var(--nav-h) + 18px);transform:translate(-50%,14px);
+  z-index:95;background:rgba(20,24,40,.95);border:1px solid var(--line-2);
+  border-radius:13px;padding:11px 16px;font-size:12.8px;color:var(--tx);
+  backdrop-filter:blur(14px);opacity:0;transition:.3s var(--ease);pointer-events:none;
+  max-width:84%;text-align:center;line-height:1.45;
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ============================================================
+   Responsive — la app ocupa toda la pantalla en móvil
+   ============================================================ */
+@media (max-width:1080px){
+  .aside{display:none}
+  body{padding:0;gap:0;align-items:stretch;justify-content:stretch;background:var(--bg)}
+  .stage{width:100%;gap:0}
+  .device{
+    width:100%;height:100dvh;max-height:none;aspect-ratio:auto;
+    border-radius:0;padding:0;box-shadow:none;background:var(--bg);
+  }
+  .screen{border-radius:0}
+  .notch{display:none}
+  .statusbar{display:none}
+  .scroll{padding-top:calc(22px + env(safe-area-inset-top))}
+  .cam-mini{top:calc(16px + env(safe-area-inset-top))}
+  .pill{top:calc(18px + env(safe-area-inset-top))}
+  .ob-top{padding-top:calc(24px + env(safe-area-inset-top))}
+  .nav{padding-bottom:calc(6px + env(safe-area-inset-bottom));height:calc(var(--nav-h) + env(safe-area-inset-bottom))}
+}
+/* Pantallas bajas (móvil en horizontal): todo cabe y nada queda
+   debajo de la barra de navegación. */
+@media (max-height:620px){
+  .perm{justify-content:flex-start;padding:20px 26px 16px}
+  .perm-art{width:64px;height:64px;border-radius:20px;margin-bottom:10px}
+  .perm h2{font-size:18px;margin-bottom:6px}
+  .perm p{font-size:12px;line-height:1.5;margin-bottom:4px}
+  .perm .btns{margin-top:14px}
+  .perm .btn{height:44px;font-size:14px}
+  .ob-art{width:96px;height:96px}
+  .ob-slide h2{font-size:20px}
+  .ob-slide{justify-content:flex-start;padding-top:6px}
+  .ob-foot{padding:12px 22px 16px}
+  .ob-foot .btn{height:44px}
+  .ob-foot .btn-quiet{height:34px}
+}
+
+/* Tablets: el contenido no se estira a lo ancho de la pantalla */
+@media (min-width:600px) and (max-width:1080px){
+  .scroll{max-width:600px;margin:0 auto;width:100%}
+  .perm > *{max-width:520px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.05ms !important}
+}
+:focus-visible{outline:2px solid var(--acc-2);outline-offset:2px;border-radius:8px}
+</style>
+</head>
+<body>
+
+<!-- gradiente compartido para iconos de navegación -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="navgrad" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#7C5CFF"/><stop offset="100%" stop-color="#00D9F5"/>
+  </linearGradient>
+</defs></svg>
+
+<aside class="aside">
+  <div>
+    <h1>MathMotion<br><span>Cálculo en Movimiento</span></h1>
+  </div>
+  <p>Prototipo de interfaz del primer corte. Toda la navegación, la gráfica y los cinco modos gestuales funcionan; el cálculo se resuelve con un motor local que se reemplaza por el servicio de FastAPI cambiando una sola variable.</p>
+  <div class="legend">
+    <div><i style="background:#25D9F0"></i> f(x) — función</div>
+    <div><i style="background:#A78BFA"></i> f′(x) — razón de cambio</div>
+    <div><i style="background:#FF6FA5"></i> f″(x) — concavidad</div>
+    <div><i style="background:#3DDC97"></i> recta tangente</div>
+    <div><i style="background:#FFA83D"></i> recta secante</div>
+  </div>
+  <p class="note">Para conectar el backend: <code>Ajustes → Servidor de cálculo</code>. Al escribir una URL, todas las peticiones salen a <code>POST /calcular</code> con el mismo contrato JSON del documento.</p>
+</aside>
+
+<div class="stage">
+<div class="device">
+<div class="screen" id="screen">
+  <div class="notch"></div>
+  <div class="statusbar">
+    <span id="clock">9:41</span>
+    <span class="sb-icons">
+      <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x=".5" y=".5" width="21" height="11" rx="3.2" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="16" height="8" rx="2" fill="currentColor"/><path d="M23 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".45"/></svg>
+    </span>
+  </div>
+
+  <!-- ═══════════ ONBOARDING ═══════════ -->
+  <section class="view no-nav" id="v-onboarding">
+    <div class="scroll">
+      <div class="ob-top">
+        <div class="ob-dots" id="obDots"></div>
+        <button class="btn-quiet" style="width:auto;padding:0" id="obSkip">Saltar</button>
+      </div>
+      <div style="flex:1;overflow:hidden;display:flex">
+        <div class="ob-track" id="obTrack"></div>
+      </div>
+      <div class="ob-foot">
+        <button class="btn btn-primary" id="obNext">Siguiente</button>
+        <button class="btn btn-quiet" id="obBack">Atrás</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ INICIO ═══════════ -->
+  <section class="view" id="v-home">
+    <div class="scroll">
+      <div class="hero">
+        <svg class="hero-grid" viewBox="0 0 340 240" preserveAspectRatio="none" aria-hidden="true">
+          <defs><pattern id="hg" width="26" height="26" patternUnits="userSpaceOnUse">
+            <path d="M26 0H0V26" fill="none" stroke="rgba(255,255,255,.045)" stroke-width="1"/>
+          </pattern></defs>
+          <rect width="340" height="240" fill="url(#hg)"/>
+        </svg>
+        <div class="hero-mark"><span class="dot"></span><span>Cálculo Diferencial · Ingeniería</span></div>
+        <h2>MathMotion</h2>
+        <p class="sub">Cálculo en Movimiento</p>
+        <p>Levanta la mano frente a la cámara. El número de dedos decide qué le pasa a la gráfica: evaluar, derivar, comparar o optimizar.</p>
+        <svg class="hero-curve" viewBox="0 0 150 90" fill="none" aria-hidden="true">
+          <path d="M2 78C22 78 34 20 58 20s30 52 52 52 36-40 38-52" stroke="#25D9F0" stroke-width="2.4" stroke-linecap="round" opacity=".9"/>
+          <circle cx="58" cy="20" r="4.5" fill="#7C5CFF"/>
+        </svg>
+      </div>
+
+      <div class="sect">
+        <div class="sect-head"><h3 class="h-l">Los cinco gestos</h3></div>
+        <div class="gest-list" id="homeGestures"></div>
+      </div>
+
+      <div class="sect">
+        <div class="sect-head">
+          <h3 class="h-l">Función en pantalla</h3>
+          <a href="#" data-go="functions">Cambiar</a>
+        </div>
+        <div class="fn-active" id="homeActiveFn"></div>
+      </div>
+
+      <div class="sect">
+        <div class="sect-head"><h3 class="h-l">Cómo funciona</h3></div>
+        <div class="flow">
+          <div class="flow-step"><div class="flow-rail"><div class="b">1</div><div class="l"></div></div>
+            <div class="flow-body"><h4>La cámara ve la mano</h4><p>La cámara frontal captura el gesto y el sistema cuenta los dedos extendidos.</p></div></div>
+          <div class="flow-step"><div class="flow-rail"><div class="b">2</div><div class="l"></div></div>
+            <div class="flow-body"><h4>El servidor calcula</h4><p>El número de dedos y la posición x = a viajan en JSON al motor de cálculo.</p></div></div>
+          <div class="flow-step"><div class="flow-rail"><div class="b">3</div></div>
+            <div class="flow-body"><h4>La gráfica responde</h4><p>Vuelven ecuaciones, valores y coordenadas; la curva se actualiza al instante.</p></div></div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="margin-top:8px" data-go="camera">Abrir la cámara</button>
+      <p class="small" style="text-align:center;margin-top:14px">Sin cámara disponible también funciona: el selector de 1 a 5 dedos controla todo.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════ FUNCIONES ═══════════ -->
+  <section class="view" id="v-functions">
+    <div class="scroll">
+      <p class="eyebrow">Biblioteca</p>
+      <h2 class="h-xl">Funciones</h2>
+      <p class="body" style="margin:10px 0 16px">Ejemplos diferenciables para probar la interfaz. La función oficial la asigna la docente y se carga desde el servidor.</p>
+      <div class="chip-row" id="fnFilters"></div>
+      <div class="fn-grid" id="fnGrid" style="margin-top:14px"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ HISTORIAL ═══════════ -->
+  <section class="view" id="v-history">
+    <div class="scroll">
+      <p class="eyebrow">Sesiones guardadas</p>
+      <h2 class="h-xl">Historial</h2>
+      <div class="chip-row" id="histFilters" style="margin-top:16px"></div>
+      <div id="histList"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ AJUSTES ═══════════ -->
+  <section class="view" id="v-settings">
+    <div class="scroll">
+      <p class="eyebrow">Preferencias</p>
+      <h2 class="h-xl">Ajustes</h2>
+      <div id="settingsBody"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ CÁMARA + GRÁFICA ═══════════ -->
+  <section class="view" id="v-camera">
+    <div class="cam-wrap">
+
+      <div class="graph-zone">
+        <svg class="graph-svg" id="graph" viewBox="0 0 400 400" preserveAspectRatio="none"></svg>
+
+        <div class="pill" id="pill">
+          <div class="hd" id="pillHand"></div>
+          <div class="txt"><p class="a" id="pillTitle">Evaluación</p><p class="b" id="pillSub">1 dedo detectado</p></div>
+        </div>
+
+        <div class="cam-mini st-idle" id="camMini">
+          <video id="camVideo" autoplay playsinline muted style="display:none"></video>
+          <div class="ph" id="camPh">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5F678C" stroke-width="1.6" stroke-linecap="round"><path d="M2 7.5A2.5 2.5 0 0 1 4.5 5h2L8 3h8l1.5 2h2A2.5 2.5 0 0 1 22 7.5v10a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 17.5z"/><circle cx="12" cy="12" r="3.6"/></svg>
+            <span>Sin señal</span>
+          </div>
+          <div class="lbl" id="camLbl"><i></i><span>En espera</span></div>
+        </div>
+
+        <div class="legend-fl" id="graphLegend"></div>
+      </div>
+
+      <div class="panel" id="panel">
+        <div class="panel-grip" id="panelGrip"><i></i></div>
+        <div class="panel-body" id="panelBody"></div>
+      </div>
+    </div>
+
+    <!-- solicitud de permiso -->
+    <div class="perm" id="perm">
+      <div class="perm-art"><div id="permHand" style="width:88px;height:88px"></div></div>
+      <h2>Permitir el uso de la cámara</h2>
+      <p>MathMotion necesita la cámara frontal para contar los dedos que levantas y traducirlos en operaciones sobre la gráfica.</p>
+      <p class="small" style="margin-top:10px">El video se procesa en el dispositivo. No se graba ni se envía a ningún servidor.</p>
+      <div class="btns">
+        <button class="btn btn-primary" id="permAllow">Permitir cámara</button>
+        <button class="btn btn-ghost" id="permSkip">Continuar sin cámara</button>
+      </div>
+      <div class="warn" id="permWarn" style="display:none"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ NAVEGACIÓN ═══════════ -->
+  <nav class="nav" id="nav">
+    <button class="nav-item" data-go="home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.2 12 3.5l9 6.7V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+      <span>Inicio</span></button>
+    <button class="nav-item" data-go="functions">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c4.5 0 3.5-11 8-11s3.5 11 8 11"/><path d="M6.5 11.5h7"/></svg>
+      <span>Funciones</span></button>
+    <div class="nav-fab-wrap">
+      <button class="nav-fab" data-go="camera" aria-label="Abrir cámara">
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7.8A2.3 2.3 0 0 1 4.3 5.5h2.2L8 3.4h8l1.5 2.1h2.2A2.3 2.3 0 0 1 22 7.8v9.9a2.3 2.3 0 0 1-2.3 2.3H4.3A2.3 2.3 0 0 1 2 17.7z"/><circle cx="12" cy="12.3" r="3.7"/></svg>
+      </button>
+    </div>
+    <button class="nav-item" data-go="history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3.2 12a8.8 8.8 0 1 0 2.6-6.2"/><path d="M3 4.5V9h4.5"/><path d="M12 7.5V12l3 1.8"/></svg>
+      <span>Historial</span></button>
+    <button class="nav-item" data-go="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.5 14.2a1.6 1.6 0 0 0 .32 1.77l.06.06a1.94 1.94 0 1 1-2.75 2.75l-.06-.06a1.6 1.6 0 0 0-1.77-.32 1.6 1.6 0 0 0-.97 1.47v.17a1.94 1.94 0 0 1-3.88 0v-.09a1.6 1.6 0 0 0-1.05-1.47 1.6 1.6 0 0 0-1.77.32l-.06.06a1.94 1.94 0 1 1-2.75-2.75l.06-.06a1.6 1.6 0 0 0 .32-1.77 1.6 1.6 0 0 0-1.47-.97h-.17a1.94 1.94 0 0 1 0-3.88h.09a1.6 1.6 0 0 0 1.47-1.05 1.6 1.6 0 0 0-.32-1.77l-.06-.06a1.94 1.94 0 1 1 2.75-2.75l.06.06a1.6 1.6 0 0 0 1.77.32h.08a1.6 1.6 0 0 0 .97-1.47v-.17a1.94 1.94 0 0 1 3.88 0v.09a1.6 1.6 0 0 0 .97 1.47 1.6 1.6 0 0 0 1.77-.32l.06-.06a1.94 1.94 0 1 1 2.75 2.75l-.06.06a1.6 1.6 0 0 0-.32 1.77v.08a1.6 1.6 0 0 0 1.47.97h.17a1.94 1.94 0 0 1 0 3.88h-.09a1.6 1.6 0 0 0-1.47.97z"/></svg>
+      <span>Ajustes</span></button>
+  </nav>
+
+  <div class="toast" id="toast"></div>
+</div>
+</div>
+</div>
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   MathMotion — Prototipo de interfaz (primer corte)
+   ────────────────────────────────────────────────────────────────────
+   Organización del archivo, pensada para migrar a React Native + Expo:
+
+     1. utils          → helpers genéricos
+     2. Hand           → generador SVG de la mano (1–5 dedos)
+     3. MathEngine     → motor de cálculo LOCAL (se sustituye por FastAPI)
+     4. CATALOG        → biblioteca de funciones de demostración
+     5. API            → capa de datos. Único punto de contacto con el backend
+     6. Store          → estado global + suscripciones
+     7. Graph          → renderizador SVG de la gráfica
+     8. Screens        → una función de render por pantalla
+     9. Camera         → permisos y video
+    10. Router / init
+
+   Para conectar el backend basta con definir API.config.baseURL.
+   Ningún componente de UI conoce el origen de los datos.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. utils ───────────────────────────────────────────────────── */
+const $  = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+const fmt = (v, d=3) => {
+  if (!isFinite(v)) return '—';
+  if (Math.abs(v) >= 1e5 || (Math.abs(v) < 1e-4 && v !== 0)) return v.toExponential(2);
+  return Number(v.toFixed(d)).toString();
+};
+let _uid = 0;
+const uid = () => 'u' + (++_uid);
+
+/* Almacenamiento abstracto: en RN se cambia por AsyncStorage,
+   en web por localStorage. Aquí vive en memoria. */
+const Storage = (() => {
+  const m = new Map();
+  return {
+    get:  (k, d=null) => m.has(k) ? m.get(k) : d,
+    set:  (k, v) => { m.set(k, v); return v; },
+    del:  (k) => m.delete(k)
+  };
+})();
+
+function haptic(kind='light'){
+  if (!Store.state.settings.haptics || !navigator.vibrate) return;
+  navigator.vibrate(kind === 'error' ? [40,60,40] : kind === 'strong' ? 22 : 10);
+}
+
+let toastT;
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ── 2. Hand: mano vectorial ────────────────────────────────────
+   Sólo se dibujan los dedos levantados: el número se lee de un vistazo.
+   El pulgar aparece únicamente en el gesto de cinco dedos.
+   Convención de conteo: índice, medio, anular, meñique y por último pulgar.
+   ───────────────────────────────────────────────────────────────── */
+const FINGERS = [
+  { cx:42, w:15, top:22, rot:-9  },  // índice
+  { cx:59, w:15, top:12, rot:-2  },  // medio
+  { cx:76, w:15, top:20, rot:6   },  // anular
+  { cx:90, w:13, top:38, rot:15  }   // meñique
+];
+
+function handSVG(n, opt={}){
+  const id = uid();
+  const cls = opt.cls || '';
+  const dim = opt.dim || 'width="100%" height="100%"';
+  const BASE = 84;
+  const EDGE = 'rgba(6,8,16,.55)';   /* borde oscuro: separa dedos contiguos */
+
+  const finger = (f, up) => {
+    const x = f.cx - f.w/2, r = f.w/2;
+    if (up){
+      const h = BASE - f.top;
+      return `<rect class="fg-up" x="${x}" y="${f.top}" width="${f.w}" height="${h}" rx="${r}"
+        fill="url(#g${id})" stroke="${EDGE}" stroke-width="1.7"
+        transform="rotate(${f.rot} ${f.cx} ${BASE})"/>
+        <rect x="${x+3.2}" y="${f.top+4}" width="${f.w-6.4}" height="${Math.max(h*0.32,8)}" rx="${r}"
+        fill="#fff" opacity=".2" transform="rotate(${f.rot} ${f.cx} ${BASE})"/>`;
+    }
+    return '';
+  };
+
+  const up = [n>=1, n>=2, n>=3, n>=4];
+  const thumbUp = n >= 5;
+
+  return `<svg viewBox="1 6 107 143" ${dim} class="hand ${cls}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <linearGradient id="g${id}" x1="0" y1="0" x2=".85" y2="1">
+      <stop offset="0%" stop-color="#9C86FF"/>
+      <stop offset="55%" stop-color="#7C5CFF"/>
+      <stop offset="100%" stop-color="#22C8F0"/>
+    </linearGradient>
+    <filter id="f${id}" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#5B3FE0" flood-opacity=".45"/>
+    </filter>
+  </defs>
+  <g filter="url(#f${id})">
+    <!-- muñeca -->
+    <rect x="45" y="116" width="32" height="30" rx="13" fill="url(#g${id})" opacity=".85"/>
+    <!-- pulgar extendido (detrás de la palma) -->
+    ${thumbUp ? `
+      <path d="M44 114 Q22 108 11 79" fill="none" stroke="${EDGE}" stroke-width="21" stroke-linecap="round"/>
+      <path d="M44 114 Q22 108 11 79" fill="none" stroke="url(#g${id})" stroke-width="17.4" stroke-linecap="round"/>
+      <path d="M42 112 Q24 105 16 83" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".15"/>` : ''}
+    <!-- dedos -->
+    ${FINGERS.map((f,i) => finger(f, up[i])).join('')}
+    <!-- palma -->
+    <rect x="28" y="68" width="66" height="56" rx="23" fill="url(#g${id})"
+      stroke="${EDGE}" stroke-width="1.7"/>
+    <ellipse cx="56" cy="87" rx="19" ry="12" fill="#fff" opacity=".14"/>
+    <!-- pulgar recogido (delante de la palma) -->
+
+  </g>
+</svg>`;
+}
+
+/* ── 3. MathEngine: cálculo local (reemplazable por FastAPI) ─────
+   Derivadas por diferencias centrales. Existe sólo para que el
+   prototipo dibuje algo real mientras el servidor no está listo.
+   ───────────────────────────────────────────────────────────────── */
+const MathEngine = {
+  compile(expr){
+    try { return new Function('x', 'with (Math) { return (' + expr + '); }'); }
+    catch(e){ return () => NaN; }
+  },
+  d1(f, x, h=1e-4){ return (f(x+h) - f(x-h)) / (2*h); },
+  d2(f, x, h=1e-3){ return (f(x+h) - 2*f(x) + f(x-h)) / (h*h); },
+
+  sample(f, [a,b], n=420){
+    const out = [], step = (b-a)/n;
+    for (let i=0;i<=n;i++){ const x = a + i*step; out.push([x, f(x)]); }
+    return out;
+  },
+
+  /* raíces de g por cambio de signo + bisección */
+  roots(g, [a,b], n=600){
+    const out = [], step = (b-a)/n;
+    let px = a, pv = g(a);
+    for (let i=1;i<=n;i++){
+      const x = a + i*step, v = g(x);
+      if (isFinite(pv) && isFinite(v) && pv*v < 0){
+        let lo=px, hi=x;
+        for (let k=0;k<48;k++){
+          const m=(lo+hi)/2;
+          (g(lo)*g(m) <= 0) ? hi=m : lo=m;
+        }
+        out.push((lo+hi)/2);
+      }
+      px = x; pv = v;
+    }
+    return out;
+  },
+
+  criticalPoints(f, dom){
+    const fp = x => this.d1(f,x), fpp = x => this.d2(f,x);
+    const pts = [];
+    for (const x of this.roots(fp, dom)){
+      const c = fpp(x);
+      pts.push({ tipo: c < -1e-6 ? 'maximo' : c > 1e-6 ? 'minimo' : 'critico', x, y: f(x) });
+    }
+    for (const x of this.roots(fpp, dom)) pts.push({ tipo:'inflexion', x, y: f(x) });
+    return pts.sort((p,q) => p.x - q.x);
+  },
+
+  intervals(f, dom){
+    const fp = x => this.d1(f,x);
+    const cuts = [dom[0], ...this.roots(fp, dom), dom[1]];
+    const out = [];
+    for (let i=0;i<cuts.length-1;i++){
+      const m = (cuts[i]+cuts[i+1])/2;
+      out.push({ tipo: fp(m) >= 0 ? 'creciente' : 'decreciente', x0:cuts[i], x1:cuts[i+1] });
+    }
+    return out;
+  }
+};
+
+/* ── 4. CATALOG: funciones de demostración ──────────────────────
+   La función definitiva la asigna la docente; el sistema opera con
+   cualquier función diferenciable que llegue desde el servidor.
+   ───────────────────────────────────────────────────────────────── */
+const CATALOG = [
+  { id:'cubica-1', expr:'x*x*x - 3*x*x + 2', label:'f(x) = x³ − 3x² + 2', fam:'Polinómica', dom:[-1.6,3.6] },
+  { id:'cuartica', expr:'x*x*x*x/8 - 2*x*x + 3', label:'f(x) = x⁴/8 − 2x² + 3', fam:'Polinómica', dom:[-4.6,4.6] },
+  { id:'cubica-2', expr:'x*x*x/4 - 2*x', label:'f(x) = x³/4 − 2x', fam:'Polinómica', dom:[-4,4] },
+  { id:'seno', expr:'sin(x)', label:'f(x) = sin x', fam:'Trigonométrica', dom:[-6.4,6.4] },
+  { id:'x-seno', expr:'x*sin(x)', label:'f(x) = x · sin x', fam:'Trigonométrica', dom:[-8,8] },
+  { id:'gauss', expr:'exp(-x*x/4)', label:'f(x) = e^(−x²/4)', fam:'Exponencial', dom:[-5,5] },
+  { id:'amortiguada', expr:'exp(-x/3)*cos(2*x)', label:'f(x) = e^(−x/3) · cos 2x', fam:'Exponencial', dom:[0,9] },
+  { id:'racional', expr:'x/(1 + x*x)', label:'f(x) = x / (1 + x²)', fam:'Racional', dom:[-6,6] },
+  { id:'log', expr:'log(x*x + 1)', label:'f(x) = ln(x² + 1)', fam:'Logarítmica', dom:[-5,5] },
+  { id:'raiz', expr:'sqrt(x*x + 1)', label:'f(x) = √(x² + 1)', fam:'Radical', dom:[-4,4] }
+];
+
+/* ── Contenido didáctico de cada gesto ──────────────────────────── */
+const GESTURES = {
+  1:{ nombre:'Evaluación',       corto:'Recorrer f(x)',
+      desc:'Un punto recorre la curva según la posición de la mano.',
+      concepto:'Evaluar la función en x = a y leer su razón de cambio instantánea f′(a) en ese mismo punto.',
+      aplica:'Rendimiento de un sistema en un instante concreto: caudal, velocidad de operación o producción por hora.' },
+  2:{ nombre:'Recta tangente',   corto:'Derivada como pendiente',
+      desc:'Se congela x = a y aparece la tangente a la curva.',
+      concepto:'La derivada es la pendiente de la recta tangente: y − f(a) = f′(a)(x − a). La secante muestra la razón de cambio media sobre un intervalo.',
+      aplica:'Análisis de sensibilidad: cuánto responde el sistema ante un cambio pequeño de temperatura, presión o carga.' },
+  3:{ nombre:'Familia de curvas', corto:'f, f′ y f″',
+      desc:'Se superponen la función y sus dos primeras derivadas.',
+      concepto:'f describe el estado, f′ la velocidad con que cambia y f″ la concavidad, es decir, si ese cambio se acelera o se frena.',
+      aplica:'Comportamiento dinámico de un proceso: nivel, velocidad de variación y aceleración de la variación.' },
+  4:{ nombre:'Optimización',     corto:'Máximos y mínimos',
+      desc:'Se marcan máximos, mínimos e inflexiones con sombreado.',
+      concepto:'Criterio de la primera derivada para hallar puntos críticos y de la segunda para clasificarlos como máximo o mínimo.',
+      aplica:'Encontrar el punto de operación más eficiente: mínimo costo, máximo rendimiento, condición óptima de diseño.' },
+  5:{ nombre:'Reto aplicado',    corto:'Tasas de cambio',
+      desc:'Problema contextualizado con temporizador y verificación.',
+      concepto:'Interpretar tasas de cambio relacionadas dentro de una situación con unidades y contexto físico.',
+      aplica:'Variación de demanda, flujo de materiales, consumo energético y eficiencia a lo largo del tiempo.' }
+};
+
+/* ── 5. API: único punto de contacto con el backend ──────────────
+   Con baseURL vacío responde el motor local (modo prototipo).
+   Con baseURL definido usa el servicio FastAPI, con este contrato:
+
+     POST {baseURL}/calcular
+     → { "dedos": 2, "x": 1.4, "funcion_id": "cubica-1" }
+     ← { gesto, x, funcion, valores, ecuaciones, curvas,
+         puntos, intervalos, explicacion }
+
+     GET  {baseURL}/funciones      ← [ {id, expr, label, fam, dom} ]
+     GET  {baseURL}/historial      ← [ sesiones ]
+     POST {baseURL}/historial      → sesión a guardar
+   ───────────────────────────────────────────────────────────────── */
+const API = {
+  config: { baseURL:'', timeout:8000 },
+  get online(){ return !!this.config.baseURL; },
+
+  async _req(path, opts={}){
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), this.config.timeout);
+    try{
+      const r = await fetch(this.config.baseURL + path, {
+        headers:{ 'Content-Type':'application/json' }, signal:ctrl.signal, ...opts
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.json();
+    } finally { clearTimeout(t); }
+  },
+
+  async listFunctions(){
+    if (this.online){
+      try { return await this._req('/funciones'); }
+      catch(e){ toast('Sin respuesta del servidor. Se usa la biblioteca local.'); }
+    }
+    return CATALOG;
+  },
+
+  async compute({ funcionId, gesto, x }){
+    if (this.online){
+      try {
+        return await this._req('/calcular', {
+          method:'POST', body: JSON.stringify({ dedos:gesto, x, funcion_id:funcionId })
+        });
+      } catch(e){ toast('El servidor no respondió. Cálculo local.'); }
+    }
+    return this._localCompute({ funcionId, gesto, x });
+  },
+
+  /* Réplica local del contrato de respuesta del servidor */
+  _localCompute({ funcionId, gesto, x }){
+    const meta = CATALOG.find(f => f.id === funcionId) || CATALOG[0];
+    const f  = MathEngine.compile(meta.expr);
+    const fp  = v => MathEngine.d1(f, v);
+    const fpp = v => MathEngine.d2(f, v);
+    const a   = clamp(x, meta.dom[0], meta.dom[1]);
+
+    const res = {
+      gesto, x:a,
+      funcion: { id:meta.id, expr:meta.expr, label:meta.label, dom:meta.dom },
+      valores: { f_a:f(a), fp_a:fp(a), fpp_a:fpp(a) },
+      ecuaciones: {},
+      curvas: { f: MathEngine.sample(f, meta.dom) },
+      puntos: [], intervalos: [],
+      explicacion: {
+        concepto: GESTURES[gesto].concepto,
+        aplicacion: GESTURES[gesto].aplica
+      }
+    };
+
+    if (gesto === 2){
+      const m = res.valores.fp_a, b = res.valores.f_a - m*a;
+      res.ecuaciones.tangente = `y = ${fmt(m,3)}x ${b>=0?'+':'−'} ${fmt(Math.abs(b),3)}`;
+      res.ecuaciones.punto_pendiente = `y − ${fmt(res.valores.f_a,3)} = ${fmt(m,3)}(x − ${fmt(a,3)})`;
+      const h = Store.state.secant.h;
+      const b2 = clamp(a + h, meta.dom[0], meta.dom[1]);
+      if (Math.abs(b2 - a) > 1e-6){
+        const msec = (f(b2) - f(a)) / (b2 - a);
+        res.secante = { x1:a, y1:f(a), x2:b2, y2:f(b2), m:msec };
+        res.ecuaciones.secante = `m = [f(${fmt(b2,2)}) − f(${fmt(a,2)})] / ${fmt(b2-a,2)} = ${fmt(msec,3)}`;
+      }
+    }
+    if (gesto === 3){
+      res.curvas.fp  = MathEngine.sample(fp,  meta.dom);
+      res.curvas.fpp = MathEngine.sample(fpp, meta.dom);
+    }
+    if (gesto === 4){
+      res.puntos = MathEngine.criticalPoints(f, meta.dom);
+      res.intervalos = MathEngine.intervals(f, meta.dom);
+    }
+    if (gesto === 5) res.reto = buildChallenge(meta, f, fp);
+    return res;
+  },
+
+  async listHistory(){
+    if (this.online){ try { return await this._req('/historial'); } catch(e){} }
+    return Store.state.history;
+  },
+
+  async saveSession(s){
+    if (this.online){
+      try { await this._req('/historial', { method:'POST', body: JSON.stringify(s) }); }
+      catch(e){}
+    }
+    Store.state.history.unshift(s);
+    return s;
+  }
+};
+
+/* Reto generado a partir de la función activa (no de contenido inventado) */
+function buildChallenge(meta, f, fp){
+  const [a,b] = meta.dom;
+  const cand = [];
+  for (let i=0;i<=40;i++){ const x = a + (b-a)*i/40; cand.push({ x, m: fp(x) }); }
+  const best = cand.reduce((p,c) => Math.abs(c.m) > Math.abs(p.m) ? c : p);
+  const wrong = [];
+  while (wrong.length < 3){
+    const c = cand[Math.floor(Math.random()*cand.length)];
+    if (Math.abs(c.x - best.x) > (b-a)/8 && !wrong.some(w => Math.abs(w-c.x) < (b-a)/10))
+      wrong.push(c.x);
+  }
+  const opts = [best.x, ...wrong].map(v => Number(v.toFixed(2)));
+  for (let i=opts.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [opts[i],opts[j]]=[opts[j],opts[i]]; }
+  return {
+    enunciado:`Un proceso se modela con ${meta.label}. ¿En qué valor de x la magnitud de la razón de cambio |f′(x)| es mayor dentro del intervalo mostrado?`,
+    opciones: opts,
+    correcta: Number(best.x.toFixed(2)),
+    pista:'La razón de cambio es la pendiente. Busca dónde la curva sube o baja más rápido.',
+    segundos: 45
+  };
+}
+
+/* ── 6. Store: estado global ─────────────────────────────────────── */
+const Store = {
+  state: {
+    screen:'home',
+    onboarded:false,
+    gesto:1,
+    a:0.6,
+    fnId:'cubica-1',
+    secant:{ on:true, h:1.4 },
+    camera:{ granted:false, active:false, status:'idle' },
+    settings:{ haptics:true, autoDetect:true, grid:true, baseURL:'' },
+    filterFam:'Todas',
+    filterGesto:'all',
+    panelOpen:true,
+    result:null,
+    quiz:null,
+    history:[]
+  },
+  subs:[],
+  sub(fn){ this.subs.push(fn); },
+  set(patch){ Object.assign(this.state, patch); this.subs.forEach(f => f(this.state)); },
+  get fn(){ return CATALOG.find(f => f.id === this.state.fnId) || CATALOG[0]; }
+};
+
+/* Historial de ejemplo — se sustituye por GET /historial */
+(function seedHistory(){
+  const now = new Date();
+  const at = (d,h,m) => {
+    const t = new Date(now.getTime() - d*864e5);
+    t.setHours(h, m, 0, 0);
+    return t.toISOString();
+  };
+  Store.state.history = [
+    { id:uid(), fecha:at(0,15,42), gesto:4, funcion:'f(x) = x⁴/8 − 2x² + 3', x:2.83, valor:-1.0, nota:'2 mínimos, 1 máximo' },
+    { id:uid(), fecha:at(0,11,08), gesto:2, funcion:'f(x) = x³ − 3x² + 2',   x:1.40, valor:-4.2, nota:'pendiente negativa' },
+    { id:uid(), fecha:at(1,19,25), gesto:1, funcion:'f(x) = sin x',          x:1.57, valor:1.0,  nota:'máximo del seno' },
+    { id:uid(), fecha:at(1,18,03), gesto:3, funcion:'f(x) = e^(−x²/4)',      x:0.00, valor:1.0,  nota:'f″ < 0 en el vértice' },
+    { id:uid(), fecha:at(3,16,50), gesto:5, funcion:'f(x) = x · sin x',      x:4.20, valor:3.7,  nota:'reto resuelto' },
+    { id:uid(), fecha:at(3,09,14), gesto:1, funcion:'f(x) = x / (1 + x²)',   x:1.00, valor:0.5,  nota:'punto medio' }
+  ];
+})();
+
+/* ── 7. Graph: renderizador SVG de la gráfica ────────────────────
+   Ocupa el 70 % superior de la pantalla principal.
+   Recibe la respuesta de API.compute y la dibuja. Nada más.
+   ───────────────────────────────────────────────────────────────── */
+const Graph = {
+  el:null, W:0, H:0, pad:{ l:14, r:14, t:34, b:42 },
+
+  init(){ this.el = $('#graph'); },
+
+  measure(){
+    const r = this.el.getBoundingClientRect();
+    this.W = Math.max(r.width, 200);
+    this.H = Math.max(r.height, 200);
+    this.el.setAttribute('viewBox', `0 0 ${this.W} ${this.H}`);
+    this.el.setAttribute('preserveAspectRatio', 'none');
+  },
+
+  niceStep(range, target=7){
+    const raw = range / target, p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const n = raw / p;
+    return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * p;
+  },
+
+  yRange(res){
+    const ys = [];
+    const push = arr => arr && arr.forEach(([,y]) => { if (isFinite(y)) ys.push(y); });
+    push(res.curvas.f);
+    if (res.gesto === 3){ push(res.curvas.fp); push(res.curvas.fpp); }
+    if (!ys.length) return [-1,1];
+    ys.sort((a,b) => a-b);
+    const q = p => ys[clamp(Math.round(p*(ys.length-1)), 0, ys.length-1)];
+    let lo = q(0.02), hi = q(0.98);
+    if (isFinite(res.valores.f_a)){ lo = Math.min(lo, res.valores.f_a); hi = Math.max(hi, res.valores.f_a); }
+    if (hi - lo < 1e-6){ lo -= 1; hi += 1; }
+    const m = (hi - lo) * 0.18;
+    return [lo - m, hi + m];
+  },
+
+  render(res){
+    if (!res) return;
+    this.measure();
+    const { W,H,pad } = this;
+    const [x0,x1] = res.funcion.dom;
+    const [y0,y1] = this.yRange(res);
+    const sx = x => pad.l + (x - x0)/(x1 - x0) * (W - pad.l - pad.r);
+    const sy = y => H - pad.b - (y - y0)/(y1 - y0) * (H - pad.t - pad.b);
+    const grid = Store.state.settings.grid;
+    let s = '';
+
+    /* ─ retícula y ejes ─ */
+    if (grid){
+      const stepX = this.niceStep(x1-x0), stepY = this.niceStep(y1-y0, 5);
+      for (let x = Math.ceil(x0/stepX)*stepX; x <= x1; x += stepX)
+        s += `<line x1="${sx(x)}" y1="${pad.t-12}" x2="${sx(x)}" y2="${H-pad.b}" stroke="rgba(255,255,255,.045)" stroke-width="1"/>`;
+      for (let y = Math.ceil(y0/stepY)*stepY; y <= y1; y += stepY)
+        s += `<line x1="${pad.l}" y1="${sy(y)}" x2="${W-pad.r}" y2="${sy(y)}" stroke="rgba(255,255,255,.045)" stroke-width="1"/>`;
+      for (let x = Math.ceil(x0/stepX)*stepX; x <= x1; x += stepX){
+        if (Math.abs(x) < 1e-9) continue;
+        s += `<text x="${sx(x)}" y="${H-26}" fill="#5F678C" font-size="9.5" font-family="ui-monospace,monospace" text-anchor="middle">${fmt(x,1)}</text>`;
+      }
+    }
+    /* ejes */
+    if (y0 < 0 && y1 > 0)
+      s += `<line x1="${pad.l}" y1="${sy(0)}" x2="${W-pad.r}" y2="${sy(0)}" stroke="rgba(255,255,255,.24)" stroke-width="1.2"/>`;
+    if (x0 < 0 && x1 > 0)
+      s += `<line x1="${sx(0)}" y1="${pad.t-12}" x2="${sx(0)}" y2="${H-pad.b}" stroke="rgba(255,255,255,.24)" stroke-width="1.2"/>`;
+
+    /* ─ sombreado de intervalos (gesto 4) ─ */
+    if (res.intervalos && res.intervalos.length){
+      for (const iv of res.intervalos){
+        const xa = sx(iv.x0), xb = sx(iv.x1);
+        s += `<rect x="${Math.min(xa,xb)}" y="${pad.t-12}" width="${Math.abs(xb-xa)}" height="${H-pad.b-pad.t+12}"
+          fill="${iv.tipo==='creciente' ? 'rgba(61,220,151,.06)' : 'rgba(255,92,122,.06)'}"/>`;
+      }
+    }
+
+    /* ─ curvas ─ */
+    const path = pts => {
+      let d = '', open = false;
+      for (const [x,y] of pts){
+        const okv = isFinite(y) && y > y0 - (y1-y0)*3 && y < y1 + (y1-y0)*3;
+        if (!okv){ open = false; continue; }
+        d += (open ? 'L' : 'M') + sx(x).toFixed(1) + ' ' + sy(y).toFixed(1) + ' ';
+        open = true;
+      }
+      return d;
+    };
+    if (res.gesto === 3 && res.curvas.fpp)
+      s += `<path d="${path(res.curvas.fpp)}" fill="none" stroke="var(--c-fppx)" stroke-width="2" stroke-linecap="round" stroke-dasharray="1 5" opacity=".95"/>`;
+    if (res.gesto === 3 && res.curvas.fp)
+      s += `<path d="${path(res.curvas.fp)}" fill="none" stroke="var(--c-fpx)" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="7 5" opacity=".95"/>`;
+
+    /* halo + curva principal */
+    s += `<path d="${path(res.curvas.f)}" fill="none" stroke="var(--c-fx)" stroke-width="9" opacity=".13" stroke-linecap="round" stroke-linejoin="round"/>`;
+    s += `<path d="${path(res.curvas.f)}" fill="none" stroke="var(--c-fx)" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+    /* ─ recta secante (gesto 2) ─ */
+    if (res.secante && Store.state.secant.on){
+      const { x1:xa, y1:ya, x2:xb, y2:yb, m } = res.secante;
+      const ext = v => ya + m*(v - xa);
+      s += `<line x1="${sx(x0)}" y1="${sy(ext(x0))}" x2="${sx(x1)}" y2="${sy(ext(x1))}"
+        stroke="var(--c-sec)" stroke-width="1.9" stroke-dasharray="6 5" opacity=".85"/>`;
+      s += `<circle cx="${sx(xb)}" cy="${sy(yb)}" r="4.6" fill="var(--c-sec)"/>`;
+      s += `<line x1="${sx(xa)}" y1="${sy(ya)}" x2="${sx(xb)}" y2="${sy(ya)}" stroke="var(--c-sec)" stroke-width="1" stroke-dasharray="2 3" opacity=".5"/>`;
+      s += `<line x1="${sx(xb)}" y1="${sy(ya)}" x2="${sx(xb)}" y2="${sy(yb)}" stroke="var(--c-sec)" stroke-width="1" stroke-dasharray="2 3" opacity=".5"/>`;
+    }
+
+    /* ─ recta tangente (gesto 2) ─ */
+    if (res.gesto === 2){
+      const m = res.valores.fp_a, ya = res.valores.f_a, xa = res.x;
+      const ext = v => ya + m*(v - xa);
+      s += `<line x1="${sx(x0)}" y1="${sy(ext(x0))}" x2="${sx(x1)}" y2="${sy(ext(x1))}"
+        stroke="var(--c-tan)" stroke-width="2.6" stroke-linecap="round"/>`;
+    }
+
+    /* ─ puntos críticos (gesto 4) ─ */
+    if (res.puntos && res.puntos.length){
+      const col = { maximo:'var(--c-max)', minimo:'var(--c-min)', inflexion:'var(--c-inf)', critico:'#fff' };
+      const tag = { maximo:'máx', minimo:'mín', inflexion:'infl', critico:'crít' };
+      for (const p of res.puntos){
+        if (!isFinite(p.y)) continue;
+        const cx = sx(p.x), cy = sy(p.y);
+        s += `<circle cx="${cx}" cy="${cy}" r="9" fill="${col[p.tipo]}" opacity=".2"/>`;
+        s += `<circle cx="${cx}" cy="${cy}" r="4.4" fill="${col[p.tipo]}" stroke="#06070D" stroke-width="1.6"/>`;
+        s += `<text x="${cx}" y="${cy - 14}" fill="${col[p.tipo]}" font-size="10" font-family="ui-monospace,monospace" text-anchor="middle">${tag[p.tipo]}</text>`;
+      }
+    }
+
+    /* ─ punto activo x = a ─ */
+    if (isFinite(res.valores.f_a)){
+      const cx = sx(res.x), cy = sy(res.valores.f_a);
+      s += `<line x1="${cx}" y1="${cy}" x2="${cx}" y2="${H-pad.b}" stroke="var(--acc)" stroke-width="1.3" stroke-dasharray="4 4" opacity=".6"/>`;
+      s += `<circle cx="${cx}" cy="${cy}" r="13" fill="var(--acc)" opacity=".18"><animate attributeName="r" values="11;16;11" dur="2.6s" repeatCount="indefinite"/></circle>`;
+      s += `<circle cx="${cx}" cy="${cy}" r="6" fill="#fff" stroke="var(--acc)" stroke-width="2.4"/>`;
+    }
+
+    this.el.innerHTML = s;
+    this.legend(res);
+  },
+
+  legend(res){
+    const items = [['var(--c-fx)','f(x)']];
+    if (res.gesto === 2){
+      items.push(['var(--c-tan)','tangente']);
+      if (res.secante && Store.state.secant.on) items.push(['var(--c-sec)','secante']);
+    }
+    if (res.gesto === 3){ items.push(['var(--c-fpx)','f′(x)'], ['var(--c-fppx)','f″(x)']); }
+    if (res.gesto === 4){ items.push(['var(--c-max)','máximo'], ['var(--c-min)','mínimo'], ['var(--c-inf)','inflexión']); }
+    $('#graphLegend').innerHTML = items
+      .map(([c,l]) => `<div><i style="background:${c}"></i>${l}</div>`).join('');
+  },
+
+  /* miniatura para las tarjetas de la biblioteca */
+  thumb(meta, w=160, h=82){
+    const f = MathEngine.compile(meta.expr);
+    const pts = MathEngine.sample(f, meta.dom, 120).filter(p => isFinite(p[1]));
+    if (!pts.length) return '';
+    const ys = pts.map(p => p[1]).sort((a,b) => a-b);
+    let lo = ys[0], hi = ys[ys.length-1];
+    if (hi - lo < 1e-6){ lo -= 1; hi += 1; }
+    const m = (hi-lo)*0.16;
+    lo -= m; hi += m;
+    const [a,b] = meta.dom;
+    const sx = x => 6 + (x-a)/(b-a)*(w-12);
+    const sy = y => h-6 - (y-lo)/(hi-lo)*(h-12);
+    let d = '', open = false;
+    for (const [x,y] of pts){ d += (open?'L':'M') + sx(x).toFixed(1) + ' ' + sy(y).toFixed(1) + ' '; open = true; }
+    const zero = (lo < 0 && hi > 0)
+      ? `<line x1="6" y1="${sy(0)}" x2="${w-6}" y2="${sy(0)}" stroke="rgba(255,255,255,.11)" stroke-width="1"/>` : '';
+    return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" preserveAspectRatio="none">
+      ${zero}<path d="${d}" fill="none" stroke="var(--c-fx)" stroke-width="2.2"
+      stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
+  }
+};
+
+/* ── 8. Screens ──────────────────────────────────────────────────── */
+
+/* ---------- Onboarding: tutorial de los cinco gestos ---------- */
+const OB_SLIDES = [
+  { badge:'Bienvenida', hand:null, title:'Tu mano mueve el cálculo',
+    text:'MathMotion convierte gestos frente a la cámara en operaciones sobre la gráfica de una función. Cinco gestos, cinco maneras de leer una curva.' },
+  ...[1,2,3,4,5].map(n => ({
+    badge: n === 1 ? '1 dedo' : `${n} dedos`, hand:n,
+    title: GESTURES[n].nombre, text: GESTURES[n].desc,
+    concept: GESTURES[n].concepto, apply: GESTURES[n].aplica
+  }))
+];
+
+const Onboarding = {
+  i:0,
+  mount(){
+    $('#obTrack').innerHTML = OB_SLIDES.map(s => `
+      <div class="ob-slide">
+        <div class="ob-art">${s.hand ? handSVG(s.hand, { cls:'hand-float' }) : `
+          <svg viewBox="0 0 120 120" width="100%" height="100%">
+            <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="1.4"/>
+            <path d="M14 84C32 84 40 30 60 30s28 54 46 54" fill="none" stroke="#25D9F0" stroke-width="3.4" stroke-linecap="round"/>
+            <circle cx="60" cy="30" r="7" fill="#7C5CFF"/>
+          </svg>`}</div>
+        <div class="ob-badge">${s.badge}</div>
+        <h2>${s.title}</h2>
+        <p>${s.text}</p>
+        ${s.concept ? `<div class="ob-apply"><b>Concepto.</b> ${s.concept}<br><br><b>En ingeniería.</b> ${s.apply}</div>` : ''}
+      </div>`).join('');
+    $('#obDots').innerHTML = OB_SLIDES.map(() => '<i></i>').join('');
+    $('#obTrack').style.width = (OB_SLIDES.length * 100) + '%';
+    $$('#obTrack .ob-slide').forEach(s => s.style.minWidth = (100 / OB_SLIDES.length) + '%');
+    this.go(0);
+
+    $('#obNext').onclick = () => {
+      haptic();
+      this.i < OB_SLIDES.length - 1 ? this.go(this.i + 1) : this.finish();
+    };
+    $('#obBack').onclick = () => { haptic(); this.i > 0 ? this.go(this.i - 1) : this.finish(); };
+    $('#obSkip').onclick = () => this.finish();
+  },
+  go(i){
+    this.i = i;
+    $('#obTrack').style.transform = `translateX(-${i * (100 / OB_SLIDES.length)}%)`;
+    $$('#obDots i').forEach((d,k) => d.classList.toggle('on', k === i));
+    $('#obNext').textContent = i === OB_SLIDES.length - 1 ? 'Empezar' : 'Siguiente';
+    $('#obBack').textContent = i === 0 ? 'Saltar el tutorial' : 'Atrás';
+  },
+  finish(){
+    Storage.set('onboarded', true);
+    Store.set({ onboarded:true });
+    Router.go('home');
+  }
+};
+
+/* ---------- Inicio ---------- */
+const Home = {
+  render(){
+    $('#homeGestures').innerHTML = [1,2,3,4,5].map(n => `
+      <button class="gest-item" data-gesto="${n}">
+        <div class="ic">${handSVG(n)}</div>
+        <div>
+          <p class="tt">${GESTURES[n].nombre}</p>
+          <p class="dd">${n === 1 ? '1 dedo' : n + ' dedos'} · ${GESTURES[n].corto}</p>
+        </div>
+      </button>`).join('');
+    $$('#homeGestures .gest-item').forEach(b => b.onclick = () => {
+      haptic('strong');
+      Store.set({ gesto:+b.dataset.gesto });
+      Router.go('camera');
+    });
+
+    const f = Store.fn;
+    $('#homeActiveFn').innerHTML = `
+      <div class="thumb">${Graph.thumb(f, 120, 70)}</div>
+      <div style="min-width:0">
+        <p class="mono" style="font-size:14px;margin:0 0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.label}</p>
+        <span class="tag">Demostración</span>
+        <p class="small" style="margin-top:7px">Dominio [${f.dom[0]}, ${f.dom[1]}] · ${f.fam}</p>
+      </div>`;
+  }
+};
+
+/* ---------- Biblioteca de funciones ---------- */
+const Functions = {
+  async render(){
+    const list = await API.listFunctions();
+    const fams = ['Todas', ...new Set(list.map(f => f.fam))];
+    $('#fnFilters').innerHTML = fams.map(f =>
+      `<button class="chip ${Store.state.filterFam === f ? 'on' : ''}" data-fam="${f}">${f}</button>`).join('');
+    $$('#fnFilters .chip').forEach(c => c.onclick = () => {
+      Store.set({ filterFam:c.dataset.fam }); this.render();
+    });
+
+    const vis = list.filter(f => Store.state.filterFam === 'Todas' || f.fam === Store.state.filterFam);
+    $('#fnGrid').innerHTML = vis.map(f => `
+      <button class="fn-card ${f.id === Store.state.fnId ? 'on' : ''}" data-fn="${f.id}">
+        <div class="prev">${Graph.thumb(f)}${f.id === Store.state.fnId ? '<span class="badge">En uso</span>' : ''}</div>
+        <div class="meta">
+          <p class="expr">${f.label}</p>
+          <p class="fam">${f.fam} · [${f.dom[0]}, ${f.dom[1]}]</p>
+        </div>
+      </button>`).join('');
+
+    $$('#fnGrid .fn-card').forEach(c => c.onclick = () => {
+      const f = CATALOG.find(x => x.id === c.dataset.fn);
+      haptic('strong');
+      Store.set({ fnId:f.id, a: Number(((f.dom[0]+f.dom[1])/2).toFixed(2)) });
+      this.render(); Home.render();
+      toast('Función en pantalla: ' + f.label);
+      setTimeout(() => Router.go('camera'), 420);
+    });
+  }
+};
+
+/* ---------- Historial ---------- */
+const History = {
+  async render(){
+    const all = await API.listHistory();
+    const g = Store.state.filterGesto;
+    $('#histFilters').innerHTML =
+      `<button class="chip ${g==='all'?'on':''}" data-g="all">Todos</button>` +
+      [1,2,3,4,5].map(n => `<button class="chip ${g==n?'on':''}" data-g="${n}">
+        <span style="width:15px;height:15px;display:block">${handSVG(n)}</span>${GESTURES[n].nombre}</button>`).join('');
+    $$('#histFilters .chip').forEach(c => c.onclick = () => {
+      Store.set({ filterGesto: c.dataset.g === 'all' ? 'all' : +c.dataset.g }); this.render();
+    });
+
+    const list = all.filter(s => g === 'all' || s.gesto === g);
+    if (!list.length){
+      $('#histList').innerHTML = `
+        <div class="empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#5F678C" stroke-width="1.3"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 1.8"/></svg>
+          <p class="h-m">Todavía no hay sesiones con ese gesto</p>
+          <p class="small" style="max-width:230px">Abre la cámara, levanta la mano y guarda el resultado para verlo aquí.</p>
+        </div>`;
+      return;
+    }
+    const groups = {};
+    list.forEach(s => { const k = dayLabel(s.fecha); (groups[k] = groups[k] || []).push(s); });
+    $('#histList').innerHTML = Object.entries(groups).map(([day, items]) => `
+      <p class="hist-day">${day}</p>
+      ${items.map(s => `
+        <div class="hist-item">
+          <div class="ic">${handSVG(s.gesto)}</div>
+          <div style="min-width:0">
+            <p class="t">${GESTURES[s.gesto].nombre}</p>
+            <p class="s">${s.funcion}</p>
+          </div>
+          <div class="r">
+            <p class="v">x = ${fmt(s.x,2)}</p>
+            <p class="h">${new Date(s.fecha).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}</p>
+          </div>
+        </div>`).join('')}`).join('');
+  }
+};
+
+function dayLabel(iso){
+  const d = new Date(iso), n = new Date();
+  const dd = (a,b) => a.toDateString() === b.toDateString();
+  if (dd(d,n)) return 'Hoy';
+  const y = new Date(n.getTime() - 864e5);
+  if (dd(d,y)) return 'Ayer';
+  return d.toLocaleDateString('es-CO', { day:'numeric', month:'long' });
+}
+
+/* ---------- Ajustes ---------- */
+const Settings = {
+  render(){
+    const s = Store.state.settings;
+    $('#settingsBody').innerHTML = `
+      <div class="set-group">
+        <p class="lbl">Interacción</p>
+        <div class="set-list">
+          ${row('haptics','Vibración al detectar','Confirma cada gesto con un pulso corto', s.haptics)}
+          ${row('autoDetect','Detección automática','Cuenta los dedos con la cámara. Al desactivarla queda el selector manual', s.autoDetect)}
+          ${row('grid','Retícula de la gráfica','Muestra la cuadrícula y los valores de los ejes', s.grid)}
+        </div>
+      </div>
+
+      <div class="set-group">
+        <p class="lbl">Servidor de cálculo</p>
+        <div class="set-list">
+          <div class="set-row" style="flex-direction:column;align-items:stretch;gap:10px">
+            <div>
+              <p class="t">Dirección del backend</p>
+              <p class="d">Con el campo vacío, el cálculo se resuelve en el dispositivo. Con una URL, cada gesto se envía a <span class="mono">POST /calcular</span>.</p>
+            </div>
+            <input class="inp" id="apiURL" placeholder="https://mathmotion-api.onrender.com" value="${s.baseURL}">
+            <button class="btn btn-ghost" style="height:44px" id="apiSave">Guardar dirección</button>
+          </div>
+          <div class="set-row">
+            <div><p class="t">Estado</p><p class="d">${API.online ? 'Conectado al servidor' : 'Motor local del prototipo'}</p></div>
+            <span class="rgt chip ${API.online ? 'on' : ''}">${API.online ? 'Remoto' : 'Local'}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-group">
+        <p class="lbl">Aprendizaje</p>
+        <div class="set-list">
+          <button class="set-row" id="setReplay">
+            <div><p class="t">Repetir el tutorial de gestos</p><p class="d">Vuelve a mostrar las cinco tarjetas del inicio</p></div>
+            <span class="rgt" style="color:var(--tx-3)">›</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="set-group">
+        <p class="lbl">Acerca de</p>
+        <div class="set-list">
+          <div class="set-row"><div><p class="t">MathMotion</p><p class="d">Cálculo en Movimiento · versión 0.1 — primer corte</p></div></div>
+          <div class="set-row"><div><p class="t">Curso</p><p class="d">Cálculo Diferencial · Ingeniería</p></div></div>
+          <div class="set-row"><div><p class="t">Equipo</p><p class="d">Alan Sierra Zuluaga · Integrante 2 · Integrante 3</p></div></div>
+        </div>
+      </div>
+      <p class="small" style="margin:18px 4px 0;line-height:1.55">El reconocimiento de dedos por cámara se integra en la segunda entrega. Mientras tanto el selector manual de 1 a 5 es la entrada principal.</p>`;
+
+    function row(key, t, d, on){
+      return `<button class="set-row" data-sw="${key}">
+        <div><p class="t">${t}</p><p class="d">${d}</p></div>
+        <span class="rgt switch ${on ? 'on' : ''}"></span></button>`;
+    }
+
+    $$('#settingsBody [data-sw]').forEach(b => b.onclick = () => {
+      const k = b.dataset.sw;
+      Store.state.settings[k] = !Store.state.settings[k];
+      haptic();
+      this.render();
+      if (k === 'grid') Camera.refresh();
+      if (k === 'autoDetect') Camera.updateMini();
+    });
+    $('#apiSave').onclick = () => {
+      const v = $('#apiURL').value.trim().replace(/\/$/, '');
+      Store.state.settings.baseURL = v; API.config.baseURL = v;
+      toast(v ? 'Servidor guardado. Las peticiones salen a ' + v : 'Sin servidor: cálculo local');
+      this.render(); Camera.refresh();
+    };
+    $('#setReplay').onclick = () => { Onboarding.go(0); Router.go('onboarding'); };
+  }
+};
+
+/* ---------- 9. Pantalla principal: cámara + gráfica ---------- */
+const Camera = {
+  stream:null, busy:false, quizTimer:null,
+
+  init(){
+    $('#permHand').innerHTML = handSVG(5, { cls:'hand-float' });
+    $('#permAllow').onclick = () => this.request();
+    $('#permSkip').onclick  = () => { this.openApp(false); toast('Modo manual: usa el selector de 1 a 5 dedos'); };
+
+    /* panel colapsable: arrastre vertical o toque en el asa */
+    const grip = $('#panelGrip');
+    let startY = null;
+    grip.addEventListener('pointerdown', e => { startY = e.clientY; grip.setPointerCapture(e.pointerId); });
+    grip.addEventListener('pointerup', e => {
+      if (startY === null) return;
+      const dy = e.clientY - startY; startY = null;
+      if (Math.abs(dy) < 8) this.setPanel(this.panelState === 'expanded' ? 'normal' : 'expanded');
+      else this.dragPanel(dy);
+    });
+    window.addEventListener('resize', () => this.refresh());
+  },
+
+  /* — permisos — */
+  async request(){
+    const btn = $('#permAllow');
+    btn.textContent = 'Esperando respuesta…';
+    try{
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('unsupported');
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video:{ facingMode:'user', width:{ ideal:640 }, height:{ ideal:480 } }, audio:false
+      });
+      const v = $('#camVideo');
+      v.srcObject = this.stream; v.style.display = 'block';
+      $('#camPh').style.display = 'none';
+      Store.state.camera.granted = true;
+      Store.state.camera.active = true;
+      haptic('strong');
+      this.openApp(true);
+      toast('Cámara activa. Levanta la mano frente al lente');
+    } catch(err){
+      const msg = err?.name === 'NotAllowedError'
+        ? 'Permiso denegado. Puedes activarlo después desde los ajustes del navegador.'
+        : 'No se encontró una cámara disponible en este dispositivo.';
+      $('#permWarn').style.display = 'block';
+      $('#permWarn').textContent = msg + ' La app sigue funcionando con el selector manual de 1 a 5 dedos.';
+      btn.textContent = 'Reintentar';
+      Store.state.camera.granted = false;
+    }
+  },
+
+  openApp(withCam){
+    $('#perm').classList.add('gone');
+    $('#nav').classList.remove('hide');
+    Store.state.camera.active = !!withCam;
+    Store.state.camera.status = withCam ? 'scan' : 'idle';
+    this.updateMini();
+    this.refresh();
+  },
+
+  updateMini(){
+    const c = Store.state.camera;
+    const mini = $('#camMini'), lbl = $('#camLbl');
+    let st = 'idle', text = 'Cámara apagada', col = 'var(--tx-3)';
+    if (c.active && Store.state.settings.autoDetect){
+      if (c.status === 'ok'){ st = 'ok'; text = `${Store.state.gesto} ${Store.state.gesto===1?'dedo':'dedos'}`; col = 'var(--ok)'; }
+      else { st = 'scan'; text = 'Analizando mano'; col = 'var(--c-sec)'; }
+    } else if (c.active){ st = 'idle'; text = 'Detección apagada'; }
+    mini.className = 'cam-mini st-' + st;
+    lbl.style.color = col;
+    lbl.querySelector('span').textContent = text;
+    const old = mini.querySelector('.scanline');
+    if (st === 'scan' && !old){ const s = document.createElement('div'); s.className = 'scanline'; mini.appendChild(s); }
+    if (st !== 'scan' && old) old.remove();
+  },
+
+  /* El panel tiene tres alturas: colapsado, normal (gráfica al 70 %) y ampliado */
+  panelState:'normal',
+  setPanel(st){
+    this.panelState = st;
+    const w = $('.cam-wrap'), p = $('#panel');
+    w.classList.toggle('collapsed', st === 'collapsed');
+    w.classList.toggle('expanded',  st === 'expanded');
+    p.classList.toggle('collapsed', st === 'collapsed');
+    haptic();
+    setTimeout(() => Graph.render(Store.state.result), 380);
+  },
+  dragPanel(dy){
+    const order = ['collapsed','normal','expanded'];
+    let i = order.indexOf(this.panelState);
+    i = clamp(i + (dy > 0 ? -1 : 1), 0, 2);
+    this.setPanel(order[i]);
+  },
+
+  setGesture(n){
+    if (n === Store.state.gesto) return;
+    Store.set({ gesto:n, quiz:null });
+    haptic('strong');
+    const c = Store.state.camera;
+    if (c.active){
+      c.status = 'ok'; this.updateMini();
+      setTimeout(() => { c.status = 'scan'; this.updateMini(); }, 1400);
+    }
+    $('#pill').classList.remove('pop'); void $('#pill').offsetWidth; $('#pill').classList.add('pop');
+    /* el reto necesita leerse entero: el panel se abre solo */
+    if (n === 5) this.setPanel('expanded');
+    else if (this.panelState === 'expanded') this.setPanel('normal');
+    this.refresh();
+  },
+
+  async refresh(){
+    if (this.busy) return;
+    this.busy = true;
+    const st = Store.state;
+    const res = await API.compute({ funcionId: st.fnId, gesto: st.gesto, x: st.a });
+    Store.state.result = res;
+    Graph.render(res);
+    this.renderPill();
+    this.renderPanel(res);
+    this.busy = false;
+  },
+
+  renderPill(){
+    const n = Store.state.gesto;
+    $('#pillHand').innerHTML = handSVG(n);
+    $('#pillTitle').textContent = GESTURES[n].nombre;
+    $('#pillSub').textContent = `${n} ${n===1?'dedo':'dedos'} · ${Store.state.camera.active ? 'cámara activa' : 'selector manual'}`;
+  },
+
+  renderPanel(res){
+    const n = Store.state.gesto, f = Store.fn, v = res.valores;
+    let mid = '';
+
+    if (n === 1 || n === 2){
+      mid += `<div class="vals">
+        ${val('f(a)', fmt(v.f_a), 'var(--c-fx)')}
+        ${val("f′(a)", fmt(v.fp_a), 'var(--c-fpx)')}
+      </div>`;
+    }
+    if (n === 2){
+      mid += `<div class="eqbox"><p class="k">Recta tangente en x = ${fmt(res.x,2)}</p>
+        <p class="v">${res.ecuaciones.punto_pendiente}</p>
+        <p class="v" style="color:var(--c-tan);margin-top:5px">${res.ecuaciones.tangente}</p></div>`;
+      mid += `<div class="ctrl">
+        <div class="ctrl-head"><span class="l">Segundo punto de la secante · h</span>
+        <span class="v" style="color:var(--c-sec)">h = ${fmt(Store.state.secant.h,2)}</span></div>
+        <input type="range" id="secH" min="0.2" max="3" step="0.05" value="${Store.state.secant.h}">
+        ${res.ecuaciones.secante ? `<p class="small mono" style="color:var(--c-sec)">${res.ecuaciones.secante}</p>` : ''}
+        <p class="small" style="margin-top:6px">Al reducir h, la secante se acerca a la tangente: la razón de cambio media tiende a la instantánea.</p>
+      </div>`;
+    }
+    if (n === 3){
+      mid += `<div class="vals">
+        ${val('f(a)', fmt(v.f_a), 'var(--c-fx)')}
+        ${val("f′(a)", fmt(v.fp_a), 'var(--c-fpx)')}
+        ${val("f″(a)", fmt(v.fpp_a), 'var(--c-fppx)')}
+        ${val('Concavidad', v.fpp_a >= 0 ? 'hacia arriba' : 'hacia abajo', v.fpp_a >= 0 ? 'var(--c-min)' : 'var(--c-max)')}
+      </div>`;
+    }
+    if (n === 4){
+      const p = res.puntos.filter(p => isFinite(p.y));
+      mid += p.length ? `<div style="margin-bottom:12px">${p.map(pt => {
+        const col = { maximo:'var(--c-max)', minimo:'var(--c-min)', inflexion:'var(--c-inf)', critico:'#fff' }[pt.tipo];
+        const nm  = { maximo:'Máximo local', minimo:'Mínimo local', inflexion:'Punto de inflexión', critico:'Punto crítico' }[pt.tipo];
+        return `<div class="set-row" style="border:0;padding:9px 0">
+          <span style="width:9px;height:9px;border-radius:50%;background:${col};flex:0 0 auto"></span>
+          <div><p class="t" style="font-size:13.5px">${nm}</p>
+          <p class="d mono">x = ${fmt(pt.x,3)} · f(x) = ${fmt(pt.y,3)}</p></div></div>`;
+      }).join('')}</div>` : `<p class="small" style="margin-bottom:12px">No hay puntos críticos dentro del dominio mostrado.</p>`;
+      mid += `<p class="small" style="margin-bottom:12px">Franja verde: f crece (f′ > 0). Franja roja: f decrece (f′ < 0).</p>`;
+    }
+    if (n === 5 && res.reto){
+      const q = Store.state.quiz;
+      mid += `<div class="quiz">
+        <div class="timer"><span id="qT">${q ? q.left : res.reto.segundos}s</span>
+          <div class="bar"><i id="qBar" style="width:${q ? (q.left/res.reto.segundos*100) : 100}%"></i></div></div>
+        <p class="q">${res.reto.enunciado}</p>
+        ${res.reto.opciones.map(o => `<button class="opt ${q && q.answered !== null
+            ? (o === res.reto.correcta ? 'good' : (o === q.answered ? 'bad' : '')) : ''}"
+          data-opt="${o}">x = ${o}</button>`).join('')}
+        ${q && q.answered !== null
+          ? `<p class="small" style="margin-top:8px">${q.answered === res.reto.correcta
+              ? 'Correcto. Ahí la curva tiene la mayor inclinación, es decir |f′(x)| máximo.'
+              : 'La respuesta era x = ' + res.reto.correcta + '. ' + res.reto.pista}</p>`
+          : `<p class="small" style="margin-top:8px">${res.reto.pista}</p>`}
+      </div>`;
+    }
+
+    $('#panelBody').innerHTML = `
+      <div class="panel-head">
+        <h3>${GESTURES[n].nombre}</h3>
+        <span class="k">${n} ${n===1?'dedo':'dedos'}</span>
+      </div>
+
+      <div class="hand-row" style="margin-bottom:15px">
+        ${[1,2,3,4,5].map(k => `<button class="hand-btn ${k===n?'on':''}" data-set="${k}">
+          <span class="n">${k}</span>${handSVG(k)}</button>`).join('')}
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-head"><span class="l">Posición sobre la curva</span>
+          <span class="v mono">x = ${fmt(res.x,2)}</span></div>
+        <input type="range" id="xSlider" min="${f.dom[0]}" max="${f.dom[1]}" step="0.01" value="${res.x}">
+      </div>
+
+      ${mid}
+
+      <div class="expl">
+        <h5>Concepto</h5><p>${res.explicacion.concepto}</p>
+        <h5>Aplicación en ingeniería</h5><p>${res.explicacion.aplicacion}</p>
+      </div>
+
+      <div style="display:flex;gap:9px;margin-bottom:6px">
+        <button class="btn btn-ghost" style="height:46px;font-size:14px" id="saveSess">Guardar en historial</button>
+        <button class="btn btn-ghost" style="height:46px;font-size:14px;flex:0 0 46px" id="goFns" aria-label="Cambiar función">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 17c4.5 0 3.5-11 8-11s3.5 11 8 11"/><path d="M6.5 11.5h7"/></svg>
+        </button>
+      </div>
+      <p class="small mono" style="text-align:center;opacity:.55">${f.label}</p>`;
+
+    /* eventos del panel */
+    $$('#panelBody [data-set]').forEach(b => b.onclick = () => this.setGesture(+b.dataset.set));
+    const sl = $('#xSlider');
+    sl.oninput = e => { Store.state.a = +e.target.value; this.refreshLight(); };
+    sl.onchange = () => haptic();
+    const sh = $('#secH');
+    if (sh) sh.oninput = e => { Store.state.secant.h = +e.target.value; this.refreshLight(); };
+    $('#saveSess').onclick = async () => {
+      await API.saveSession({
+        id:uid(), fecha:new Date().toISOString(), gesto:n,
+        funcion:f.label, x:res.x, valor:v.f_a, nota:GESTURES[n].corto
+      });
+      haptic('strong'); toast('Sesión guardada en el historial'); History.render();
+    };
+    $('#goFns').onclick = () => Router.go('functions');
+    $$('#panelBody [data-opt]').forEach(b => b.onclick = () => this.answer(+b.dataset.opt));
+    if (n === 5 && res.reto && !Store.state.quiz) this.startQuiz(res.reto);
+
+    function val(k, v, c){
+      return `<div class="val"><p class="k">${k}</p><p class="v" style="color:${c}">${v}</p></div>`;
+    }
+  },
+
+  /* recálculo sin reconstruir el panel entero (para los sliders) */
+  async refreshLight(){
+    const st = Store.state;
+    const res = await API.compute({ funcionId: st.fnId, gesto: st.gesto, x: st.a });
+    Store.state.result = res;
+    Graph.render(res);
+    const head = $('#panelBody .ctrl-head .v');
+    if (head) head.textContent = 'x = ' + fmt(res.x, 2);
+    if (st.gesto === 2){
+      const eq = $$('#panelBody .eqbox .v');
+      if (eq.length){ eq[0].textContent = res.ecuaciones.punto_pendiente; eq[1].textContent = res.ecuaciones.tangente; }
+      const sec = $('#panelBody .ctrl .small.mono');
+      if (sec && res.ecuaciones.secante) sec.textContent = res.ecuaciones.secante;
+      const hv = $$('#panelBody .ctrl-head .v')[1];
+      if (hv) hv.textContent = 'h = ' + fmt(st.secant.h, 2);
+    }
+    $$('#panelBody .val').forEach((el, i) => {
+      const arr = [res.valores.f_a, res.valores.fp_a, res.valores.fpp_a];
+      if (i < 3 && arr[i] !== undefined && st.gesto !== 4) el.querySelector('.v').textContent = fmt(arr[i]);
+    });
+  },
+
+  startQuiz(reto){
+    clearInterval(this.quizTimer);
+    Store.state.quiz = { left: reto.segundos, answered:null };
+    this.quizTimer = setInterval(() => {
+      const q = Store.state.quiz;
+      if (!q || Store.state.gesto !== 5){ clearInterval(this.quizTimer); return; }
+      q.left--;
+      const t = $('#qT'), b = $('#qBar');
+      if (t) t.textContent = q.left + 's';
+      if (b) b.style.width = (q.left / reto.segundos * 100) + '%';
+      if (q.left <= 0){ clearInterval(this.quizTimer); if (q.answered === null) this.answer(null); }
+    }, 1000);
+  },
+
+  answer(opt){
+    const q = Store.state.quiz; if (!q || q.answered !== null) return;
+    q.answered = opt;
+    clearInterval(this.quizTimer);
+    haptic(opt === Store.state.result.reto.correcta ? 'strong' : 'error');
+    this.renderPanel(Store.state.result);
+  }
+};
+
+/* ── 10. Router ──────────────────────────────────────────────────── */
+const Router = {
+  go(name){
+    const st = Store.state;
+    if (name === 'camera' && !st.camera.granted && !$('#perm').classList.contains('gone')){
+      $('#perm').classList.remove('gone');
+    }
+    Store.set({ screen:name });
+    $$('.view').forEach(v => v.classList.toggle('active', v.id === 'v-' + name));
+    const permAbierto = name === 'camera' && !$('#perm').classList.contains('gone');
+    $('#nav').classList.toggle('hide', name === 'onboarding' || permAbierto);
+    $$('.nav-item').forEach(b => b.classList.toggle('on', b.dataset.go === name));
+
+    if (name === 'home') Home.render();
+    if (name === 'functions') Functions.render();
+    if (name === 'history') History.render();
+    if (name === 'settings') Settings.render();
+    if (name === 'camera') requestAnimationFrame(() => Camera.refresh());
+    const sc = $('#v-' + name + ' .scroll'); if (sc) sc.scrollTop = 0;
+  }
+};
+
+/* ── init ────────────────────────────────────────────────────────── */
+(function init(){
+  Graph.init();
+  Camera.init();
+  Onboarding.mount();
+  Home.render();
+
+  $$('[data-go]').forEach(b => b.addEventListener('click', e => {
+    e.preventDefault(); haptic(); Router.go(b.dataset.go);
+  }));
+
+  const tick = () => {
+    $('#clock').textContent = new Date().toLocaleTimeString('es-CO',
+      { hour:'2-digit', minute:'2-digit', hour12:false });
+  };
+  tick(); setInterval(tick, 20000);
+
+  /* el tutorial sólo aparece en el primer acceso */
+  Storage.get('onboarded') ? Router.go('home') : Router.go('onboarding');
+})();
+</script>
+
+<style>
+/* colapso del panel: la gráfica gana espacio */
+.graph-zone{transition:height .35s var(--ease)}
+.cam-wrap.collapsed .graph-zone{height:88%}
+.cam-wrap.expanded  .graph-zone{height:40%}
+.panel-grip{position:relative}
+.panel-grip::after{
+  content:'';position:absolute;inset:-6px 0 -10px;
+}
+</style>
+</body>
+</html>
