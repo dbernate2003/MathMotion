@@ -225,13 +225,14 @@ input,select{font-family:inherit}
    del SVG en cada fotograma y los bordes de los dedos vibran.
    translate3d y will-change lo mantienen en su propia capa. */
 .hand-float{
-  animation:handFloat 6.5s ease-in-out infinite;
+  animation:handFloat 14s ease-in-out infinite;
   will-change:transform;
   transform:translate3d(0,0,0);
+  backface-visibility:hidden;
 }
 @keyframes handFloat{
   0%,100%{transform:translate3d(0,0,0)}
-  50%{transform:translate3d(0,-5px,0)}
+  50%{transform:translate3d(0,-3px,0)}
 }
 .hand-btn{
   position:relative;flex:1;aspect-ratio:1/1.12;
@@ -972,6 +973,7 @@ const FINGERS = [
 function handSVG(n, opt={}){
   const id = uid();
   const cls = opt.cls || '';
+  const sombra = opt.sinSombra ? '' : ` filter="url(#f${id})"`;
   const dim = opt.dim || 'width="100%" height="100%"';
   const BASE = 84;
   const EDGE = 'rgba(6,8,16,.55)';   /* borde oscuro: separa dedos contiguos */
@@ -1003,7 +1005,7 @@ function handSVG(n, opt={}){
       <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#5B3FE0" flood-opacity=".45"/>
     </filter>
   </defs>
-  <g filter="url(#f${id})">
+  <g${sombra}>
     <!-- muñeca -->
     <rect x="45" y="116" width="32" height="30" rx="13" fill="url(#g${id})" opacity=".85"/>
     <!-- pulgar extendido (detrás de la palma) -->
@@ -1490,7 +1492,7 @@ const Onboarding = {
   mount(){
     $('#obTrack').innerHTML = OB_SLIDES.map(s => `
       <div class="ob-slide">
-        <div class="ob-art">${s.hand ? handSVG(s.hand, { cls:'hand-float' }) : `
+        <div class="ob-art">${s.hand ? handSVG(s.hand, { cls:'hand-float', sinSombra:true }) : `
           <svg viewBox="0 0 120 120" width="100%" height="100%">
             <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="1.4"/>
             <path d="M14 84C32 84 40 30 60 30s28 54 46 54" fill="none" stroke="#25D9F0" stroke-width="3.4" stroke-linecap="round"/>
@@ -1719,7 +1721,7 @@ const Camera = {
   stream:null, busy:false, quizTimer:null,
 
   init(){
-    $('#permHand').innerHTML = handSVG(5, { cls:'hand-float' });
+    $('#permHand').innerHTML = handSVG(5, { cls:'hand-float', sinSombra:true });
     $('#permAllow').onclick = () => this.request();
     $('#permSkip').onclick  = () => { this.openApp(false); toast('Modo manual: usa el selector de 1 a 5 dedos'); };
 
